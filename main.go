@@ -8,7 +8,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"strconv"
-	"text/template"
 
 	pool "gopkg.in/fatih/pool.v2"
 
@@ -42,25 +41,9 @@ var (
 		NumSIPConnections: 10,
 	}
 
-	// TODO remove:
-	homeTemplate = template.Must(template.ParseFiles("test.html"))
-
 	hub     *Hub
 	sipPool pool.Pool
 )
-
-func serveHome(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", 404)
-		return
-	}
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", 405)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	homeTemplate.Execute(w, r.Host)
-}
 
 func init() {
 	if os.Getenv("TCP_PORT") != "" {
@@ -87,7 +70,6 @@ func init() {
 	}
 
 	// TODO move somewhere else
-	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
