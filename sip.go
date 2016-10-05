@@ -4,15 +4,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/knakk/sip"
-
-	pool "gopkg.in/fatih/pool.v2"
 )
 
 func sipFormMsgLogin(user, pass, dept string) sip.Message {
@@ -65,36 +62,21 @@ func sipFormMsgItemStatus(barcode string) sip.Message {
 // returns the JSON message to be sent to the user interface.
 type parserFunc func(sip.Message) Message
 
-// DoSIPCall performs a SIP request using a SIP TCP-connection from a pool. It
-// takes a SIP message as a string and a parser function to transform the SIP
-// response into a Message.
-func DoSIPCall(cfg Config, p pool.Pool, msg sip.Message, parser parserFunc) (Message, error) {
+type initFunc func() (net.Conn, error)
+
+// DoSIPCall performs a SIP request. It takes a SIP message as a string and a
+// parser function to transform the SIP response into a Message.
+func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc) (Message, error) {
 	// 0. Get connection from pool
-	conn, err := p.Get()
+	conn, err := init()
 	if err != nil {
 		return Message{}, err
 	}
 
 	// 1. Send the SIP request
 	if err = msg.Encode(conn); err != nil {
-		if err == io.EOF {
-			// Koha's SIP server periodically disconnects clients, so we
-			// try to obtain a new connection and retries the send once:
-			conn.(*pool.PoolConn).MarkUnusable()
-			conn.Close()
-			conn, err = p.Get()
-			if err != nil {
-				return Message{}, err
-			}
-			if err = msg.Encode(conn); err == nil {
-				goto msgSentOK
-			}
-		}
-		conn.(*pool.PoolConn).MarkUnusable()
-		conn.Close()
 		return Message{}, err
 	}
-msgSentOK:
 
 	if cfg.LogSIPMessages {
 		log.Printf("-> %v", strings.TrimSpace(msg.String()))
@@ -105,8 +87,6 @@ msgSentOK:
 	reader := bufio.NewReader(conn)
 	resp, err := reader.ReadBytes('\r')
 	if err != nil {
-		conn.(*pool.PoolConn).MarkUnusable()
-		conn.Close()
 		return Message{}, err
 	}
 	conn.Close()

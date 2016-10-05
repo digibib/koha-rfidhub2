@@ -9,8 +9,6 @@ import (
 	"os"
 	"strconv"
 
-	pool "gopkg.in/fatih/pool.v2"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -39,10 +37,10 @@ var (
 		SIPUser:           "autouser",
 		SIPPass:           "autopass",
 		NumSIPConnections: 10,
+		LogSIPMessages:    true,
 	}
 
-	hub     *Hub
-	sipPool pool.Pool
+	hub *Hub
 )
 
 func init() {

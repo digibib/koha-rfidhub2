@@ -1,12 +1,6 @@
 package main
 
-import (
-	"log"
-	"os"
-	"sync"
-
-	pool "gopkg.in/fatih/pool.v2"
-)
+import "sync"
 
 // Hub maintains the set of connected clients, to make sure we only have one per IP.
 type Hub struct {
@@ -17,12 +11,6 @@ type Hub struct {
 }
 
 func newHub(cfg Config) *Hub {
-	var err error
-	sipPool, err = pool.NewChannelPool(0, cfg.NumSIPConnections, initSIPConn(cfg))
-	if err != nil {
-		log.Printf("failed to init SIP connection pool: %v", err)
-		os.Exit(1)
-	}
 	return &Hub{
 		clients:     make(map[*Client]bool),
 		clientsByIP: make(map[string]*Client),

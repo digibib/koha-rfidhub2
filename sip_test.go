@@ -5,8 +5,6 @@ import (
 	"net"
 	"sync"
 	"testing"
-
-	"gopkg.in/fatih/pool.v2"
 )
 
 type SIPTestServer struct {
@@ -81,14 +79,11 @@ func TestSIPCheckin(t *testing.T) {
 	srv := newSIPTestServer()
 	defer srv.Close()
 
-	p, err := pool.NewChannelPool(1, 1, initSIPConn(Config{SIPServer: srv.Addr()}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	initFn := initSIPConn(Config{SIPServer: srv.Addr()})
 
 	srv.Respond("101YNN20140124    093621AOHUTL|AB03011143299001|AQhvmu|AJ316 salmer og sanger|AA1|CS783.4|\r")
 
-	res, err := DoSIPCall(Config{}, p, sipFormMsgCheckin("HUTL", "03011143299001"), checkinParse)
+	res, err := DoSIPCall(Config{}, initFn, sipFormMsgCheckin("HUTL", "03011143299001"), checkinParse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +99,7 @@ func TestSIPCheckin(t *testing.T) {
 	}
 
 	srv.Respond("100NUY20140128    114702AO|AB234567890|CV99|AFItem not checked out|\r")
-	res, err = DoSIPCall(Config{}, p, sipFormMsgCheckin("HUTL", "234567890"), checkinParse)
+	res, err = DoSIPCall(Config{}, initFn, sipFormMsgCheckin("HUTL", "234567890"), checkinParse)
 	if !res.Item.TransactionFailed {
 		t.Errorf("res.Item.TransactionFailed == false; want true")
 	}
@@ -113,7 +108,7 @@ func TestSIPCheckin(t *testing.T) {
 	}
 
 	srv.Respond("100YNY20140511    092216AOGRY|AB03010013753001|AQhutl|AJHeksenes historie|CS272 And|CTfroa|CY11|DAåsen|CV02|AFItem not checked out|\r")
-	res, err = DoSIPCall(Config{}, p, sipFormMsgCheckin("hutl", "03010013753001"), checkinParse)
+	res, err = DoSIPCall(Config{}, initFn, sipFormMsgCheckin("hutl", "03010013753001"), checkinParse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +121,10 @@ func TestSIPCheckout(t *testing.T) {
 	srv := newSIPTestServer()
 	defer srv.Close()
 
-	p, err := pool.NewChannelPool(1, 1, initSIPConn(Config{SIPServer: srv.Addr()}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	initFn := initSIPConn(Config{SIPServer: srv.Addr()})
 
 	srv.Respond("121NNY20140124    110740AOHUTL|AA2|AB03011174511003|AJKrutt-Kim|AH20140221    235900|\r")
-	res, err := DoSIPCall(Config{}, p, sipFormMsgCheckout("HUTL", "2", "03011174511003"), checkoutParse)
+	res, err := DoSIPCall(Config{}, initFn, sipFormMsgCheckout("HUTL", "2", "03011174511003"), checkoutParse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +139,7 @@ func TestSIPCheckout(t *testing.T) {
 	}
 
 	srv.Respond("120NUN20140124    131049AOHUTL|AA2|AB1234|AJ|AH|AFInvalid Item|BLY|\r")
-	res, err = DoSIPCall(Config{}, p, sipFormMsgCheckout("HUTL", "2", "1234"), checkoutParse)
+	res, err = DoSIPCall(Config{}, initFn, sipFormMsgCheckout("HUTL", "2", "1234"), checkoutParse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,13 +155,10 @@ func TestSIPItemStatus(t *testing.T) {
 	srv := newSIPTestServer()
 	defer srv.Close()
 
-	p, err := pool.NewChannelPool(1, 1, initSIPConn(Config{SIPServer: srv.Addr()}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	initFn := initSIPConn(Config{SIPServer: srv.Addr()})
 	srv.Respond("1801010120140228    110748AB1003010856677001|AO|AJ|\r")
 
-	res, err := DoSIPCall(Config{}, p, sipFormMsgItemStatus("1003010856677001"), itemStatusParse)
+	res, err := DoSIPCall(Config{}, initFn, sipFormMsgItemStatus("1003010856677001"), itemStatusParse)
 	if err != nil {
 		t.Fatal(err)
 	}

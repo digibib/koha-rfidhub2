@@ -61,7 +61,7 @@ func (c *Client) Run(cfg Config) {
 				c.sendToRFID(RFIDReq{Cmd: cmdEndScan})
 			case "ITEM-INFO":
 				var err error
-				c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(msg.Item.Barcode), itemStatusParse)
+				c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(msg.Item.Barcode), itemStatusParse)
 				if err != nil {
 					log.Printf("ERR [%s] SIP call: %v", c.IP, err)
 					c.sendToKoha(Message{Action: "ITEM-INFO", SIPError: true, ErrorMessage: err.Error()})
@@ -165,7 +165,7 @@ func (c *Client) Run(cfg Config) {
 					// Get item info from SIP, in order to have a title to display
 					// Don't bother calling SIP if this is allready the current item
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
-						c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
+						c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
 						if err != nil {
 							log.Printf("ERR [%s] SIP: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CONNECT", SIPError: true, ErrorMessage: err.Error()})
@@ -180,7 +180,7 @@ func (c *Client) Run(cfg Config) {
 					break
 				} else {
 					// Proceed with checkin transaciton
-					c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse)
+					c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse)
 					if err != nil {
 						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKIN", SIPError: true, ErrorMessage: err.Error()})
@@ -206,7 +206,7 @@ func (c *Client) Run(cfg Config) {
 					// Get status of item, to have title to display on screen,
 					// Don't bother calling SIP if this is allready the current item
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
-						c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
+						c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
 						if err != nil {
 							log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
@@ -220,7 +220,7 @@ func (c *Client) Run(cfg Config) {
 					c.state = RFIDWaitForCheckoutAlarmLeave
 				} else {
 					// proced with checkout transaction
-					c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgCheckout(c.branch, c.patron, resp.Barcode), checkoutParse)
+					c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgCheckout(c.branch, c.patron, resp.Barcode), checkoutParse)
 					if err != nil {
 						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
@@ -455,7 +455,9 @@ func (c *Client) readFromKoha() {
 	defer func() {
 		c.hub.Disconnect(c)
 		c.conn.Close()
-		c.rfidconn.Close()
+		if c.rfidconn != nil {
+			c.rfidconn.Close()
+		}
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
