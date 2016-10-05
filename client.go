@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -33,6 +35,7 @@ type Client struct {
 	failedAlarmOff map[string]string  // map[Barcode]Tag
 	IP             string
 	hub            *Hub
+	wlock          sync.Mutex
 	conn           *websocket.Conn
 	rfidconn       net.Conn
 	rfid           *RFIDManager
@@ -58,7 +61,23 @@ func (c *Client) Run(cfg Config) {
 				c.state = RFIDWaitForEndOK
 				c.sendToRFID(RFIDReq{Cmd: cmdEndScan})
 			case "ITEM-INFO":
+				var err error
+				c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(msg.Item.Barcode), itemStatusParse)
+				if err != nil {
+					log.Printf("ERR [%s] SIP call: %v", c.IP, err)
+					c.sendToKoha(Message{Action: "ITEM-INFO", SIPError: true, ErrorMessage: err.Error()})
+					c.quit <- true // really?
+					break
+				}
+				c.state = RFIDWaitForTagCount
+				c.rfid.Reset()
+				c.sendToRFID(RFIDReq{Cmd: cmdTagCount})
 			case "WRITE":
+				c.state = RFIDPreWriteStep1
+				c.current.Action = "WRITE"
+				c.current.Item.NumTags = msg.Item.NumTags
+				c.rfid.Reset()
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPLBN})
 			case "CHECKOUT":
 				if msg.Patron == "" {
 					c.sendToKoha(Message{Action: "CHECKOUT",
@@ -84,7 +103,7 @@ func (c *Client) Run(cfg Config) {
 				for k, v := range c.failedAlarmOff {
 					c.current = c.items[k]
 					c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOff, Data: []byte(v)})
-					break // Remaining will be triggered in case UNITWaitForRetryAlarmOff
+					break // Remaining will be triggered in case RFIDWaitForRetryAlarmOff
 				}
 				// TODO default case -> ERROR
 			}
@@ -270,6 +289,110 @@ func (c *Client) Run(cfg Config) {
 				} else {
 					c.state = RFIDCheckin
 				}
+			case RFIDWaitForTagCount:
+				c.current.Item.TransactionFailed = !resp.OK
+				c.state = RFIDIdle
+				c.current.Action = "ITEM-INFO"
+				c.current.Item.NumTags = resp.TagCount
+				c.sendToKoha(c.current)
+			case RFIDPreWriteStep1:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep2
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPLBC})
+			case RFIDPreWriteStep2:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep3
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPDTM})
+			case RFIDPreWriteStep3:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep4
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPSSB})
+			case RFIDPreWriteStep4:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep5
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPCRD})
+			case RFIDPreWriteStep5:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep6
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPWTM})
+			case RFIDPreWriteStep6:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep7
+				c.sendToRFID(RFIDReq{Cmd: cmdSLPRSS})
+			case RFIDPreWriteStep7:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDPreWriteStep8
+				c.sendToRFID(RFIDReq{Cmd: cmdTagCount})
+			case RFIDPreWriteStep8:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				if resp.TagCount != c.current.Item.NumTags {
+					// Mismatch between number of tags on the RFID-reader and
+					// expected number assigned in the UI.
+					errMsg := fmt.Sprintf("forventet %d brikke(r), men fant %d.",
+						c.current.Item.NumTags, resp.TagCount)
+					c.current.Item.Status = errMsg
+					c.current.Item.TagCountFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDWriting
+				c.sendToRFID(
+					RFIDReq{Cmd: cmdWrite,
+						Data:     []byte(c.current.Item.Barcode),
+						TagCount: c.current.Item.NumTags})
+			case RFIDWriting:
+				if !resp.OK {
+					c.current.Item.WriteFailed = true
+					c.sendToKoha(c.current)
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDIdle
+				c.current.Item.WriteFailed = false
+				c.current.Item.Status = "OK, preget"
+				c.sendToKoha(c.current)
+				// TODO default case -> ERROR
 			}
 		case <-c.quit:
 			c.write(websocket.CloseMessage, []byte{})
@@ -355,6 +478,8 @@ func (c *Client) write(mt int, payload []byte) error {
 }
 
 func (c *Client) sendToKoha(msg Message) {
+	c.wlock.Lock()
+	defer c.wlock.Unlock()
 	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	w, err := c.conn.NextWriter(websocket.TextMessage)
 	if err != nil {
@@ -375,7 +500,7 @@ func (c *Client) sendToKoha(msg Message) {
 func (c *Client) readFromRFID(r *bufio.Reader) {
 	for {
 		b, err := r.ReadBytes('\r')
-		if err != nil {
+		if err != nil && len(b) == 0 {
 			log.Printf("[%v] RFID server tcp read failed: %v", c.IP, err)
 			c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 			c.quit <- true

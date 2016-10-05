@@ -608,7 +608,6 @@ func TestBarcodesSession(t *testing.T) {
 	}
 }
 
-/*
 func TestWriteLogic(t *testing.T) {
 	// setup ->
 
@@ -624,13 +623,12 @@ func TestWriteLogic(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -640,150 +638,137 @@ func TestWriteLogic(t *testing.T) {
 
 	sipSrv.Respond("1803020120140226    203140AB03010824124004|AJHeavy metal in Baghdad|AQfhol|BGfhol|\r")
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 	d.write([]byte("OK\r"))
 	<-uiChan // CONNECT OK
 
-	err := a.c.WriteMessage(websocket.TextMessage,
-		[]byte(`{"Action":"ITEM-INFO", "Item": {"Barcode": "03010824124004"}}`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage,
+		[]byte(`{"Action":"ITEM-INFO", "Item": {"Barcode": "03010824124004"}}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "TGC\r" {
+	if msg := <-d.incoming; string(msg) != "TGC\r" {
 		t.Fatal("item-info didn't trigger RFID TagCount")
 	}
 
 	d.write([]byte("OK|2\r"))
 
-	Message := <-uiChan
+	got := <-uiChan
 	want := Message{Action: "ITEM-INFO",
-		Item: item{
+		Item: Item{
 			Label:   "Heavy metal in Baghdad",
 			Barcode: "03010824124004",
 			NumTags: 2,
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct item info ")
 	}
 
 	// 1. failed write
-	err = a.c.WriteMessage(websocket.TextMessage,
-		[]byte(`{"Action":"WRITE", "Item": {"Barcode": "03010824124004", "NumTags": 2}}`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage,
+		[]byte(`{"Action":"WRITE", "Item": {"Barcode": "03010824124004", "NumTags": 2}}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "SLPLBN|02030000\r" {
+	if msg := <-d.incoming; string(msg) != "SLPLBN|02030000\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("NOK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "WRITE",
-		Item: item{
+		Item: Item{
 			Label:       "Heavy metal in Baghdad",
 			Barcode:     "03010824124004",
 			WriteFailed: true,
 			NumTags:     2,
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message of failed write ")
 	}
 
 	// 2. succesfull write
 
-	err = a.c.WriteMessage(websocket.TextMessage,
-		[]byte(`{"Action":"WRITE", "Item": {"Barcode": "03010824124004", "NumTags": 2}}`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage,
+		[]byte(`{"Action":"WRITE", "Item": {"Barcode": "03010824124004", "NumTags": 2}}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "SLPLBN|02030000\r" {
+	if msg := <-d.incoming; string(msg) != "SLPLBN|02030000\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPLBC|NO\r" {
+	if msg := <-d.incoming; string(msg) != "SLPLBC|NO\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPDTM|DS24\r" {
+	if msg := <-d.incoming; string(msg) != "SLPDTM|DS24\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPSSB|0\r" {
+	if msg := <-d.incoming; string(msg) != "SLPSSB|0\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPCRD|1\r" {
+	if msg := <-d.incoming; string(msg) != "SLPCRD|1\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPWTM|5000\r" {
+	if msg := <-d.incoming; string(msg) != "SLPWTM|5000\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "SLPRSS|1\r" {
+	if msg := <-d.incoming; string(msg) != "SLPRSS|1\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "TGC\r" {
+	if msg := <-d.incoming; string(msg) != "TGC\r" {
 		t.Fatal("WRITE command didn't initialize the reader properly")
 	}
 
 	d.write([]byte("OK|2\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "WRT03010824124004|2|0\r" {
+	if msg := <-d.incoming; string(msg) != "WRT03010824124004|2|0\r" {
 		t.Fatal("Reader didn't get the right Write command")
 	}
 
 	d.write([]byte("OK|E004010046A847AD|E004010046A847AD\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "WRITE",
-		Item: item{
+		Item: Item{
 			Label:   "Heavy metal in Baghdad",
 			Barcode: "03010824124004",
 			NumTags: 2,
 			Status:  "OK, preget",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct item info after WRITE command ")
 	}
 
 }
+
+/*
 
 func TestUserErrors(t *testing.T) {
 
