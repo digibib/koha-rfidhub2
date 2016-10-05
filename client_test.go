@@ -255,8 +255,6 @@ func TestUnavailableSIPServer(t *testing.T) {
 
 }
 
-/*
-
 func TestCheckins(t *testing.T) {
 	// Setup: ->
 
@@ -272,13 +270,12 @@ func TestCheckins(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -286,18 +283,17 @@ func TestCheckins(t *testing.T) {
 
 	// <- end setup
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 
 	d.write([]byte("OK\r"))
 
 	// Verify that UI get's CONNECT message
-	Message := <-uiChan
+	got := <-uiChan
 	want := Message{Action: "CONNECT"}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get notified of succesfull rfid connect")
 	}
 
@@ -308,8 +304,7 @@ func TestCheckins(t *testing.T) {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "BEG\r" {
+	if msg := <-d.incoming; string(msg) != "BEG\r" {
 		t.Fatal("UI -> CHECKIN: RFID-unit didn't get instructed to start scanning")
 	}
 
@@ -321,16 +316,15 @@ func TestCheckins(t *testing.T) {
 	sipSrv.Respond("101YNN20140226    161239AO|AB03010824124004|AQfhol|AJHeavy metal in Baghdad|CTfbol|AA2|CS927.8|\r")
 	d.write([]byte("RDT1003010824124004:NO:02030000|0\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "OK1\r" {
+	if msg := <-d.incoming; string(msg) != "OK1\r" {
 		t.Errorf("Checkin: RFID reader didn't get instructed to turn on alarm")
 	}
 	// simulate failed alarm command
 	d.write([]byte("NOK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKIN",
-		Item: item{
+		Item: Item{
 			Label:         "Heavy metal in Baghdad",
 			Barcode:       "03010824124004",
 			Date:          "26/02/2014",
@@ -338,8 +332,8 @@ func TestCheckins(t *testing.T) {
 			Transfer:      "fbol",
 			Status:        "Feil: fikk ikke skrudd på alarm.",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message after checkin")
 	}
 
@@ -349,22 +343,21 @@ func TestCheckins(t *testing.T) {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "ACT1003010824124004:NO:02030000\r" {
+	println("blocking?")
+	if msg := <-d.incoming; string(msg) != "ACT1003010824124004:NO:02030000\r" {
 		t.Fatal("UI -> RETRY-ALARM-ON didn't trigger the right RFID command")
 	}
-
 	d.write([]byte("OK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKIN",
-		Item: item{
+		Item: Item{
 			Label:   "Heavy metal in Baghdad",
 			Barcode: "03010824124004",
 			Date:    "26/02/2014",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message after checkin retry alarm on")
 	}
 
@@ -373,23 +366,22 @@ func TestCheckins(t *testing.T) {
 	sipSrv.Respond("100NUY20140128    114702AO|AB1234|CV99|AFItem not checked out|\r")
 	d.write([]byte("RDT1234:NO:02030000|0\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "OK \r" {
+	if msg := <-d.incoming; string(msg) != "OK \r" {
 		t.Errorf("Alarm was changed after unsuccessful checkin")
 	}
 
 	d.write([]byte("OK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKIN",
-		Item: item{
+		Item: Item{
 			Barcode:           "1234",
 			TransactionFailed: true,
 			Unknown:           true,
 			Status:            "eksemplaret finnes ikke i basen",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 	}
 
 	// Simulate book on RFID-unit, but with missing tags. Verify that UI gets
@@ -397,21 +389,20 @@ func TestCheckins(t *testing.T) {
 	sipSrv.Respond("1803020120140226    203140AB03010824124004|AO|AJHeavy metal in Baghdad|AQfhol|BGfhol|\r")
 	d.write([]byte("RDT1003010824124004:NO:02030000|1\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "OK \r" {
+	if msg := <-d.incoming; string(msg) != "OK \r" {
 		t.Error("Alarm was changed after unsuccessful checkin")
 	}
 	d.write([]byte("OK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKIN",
-		Item: item{
+		Item: Item{
 			Label:             "Heavy metal in Baghdad",
 			Barcode:           "03010824124004",
 			TransactionFailed: true,
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message when item is missing tags")
 	}
 
@@ -426,6 +417,7 @@ func TestCheckins(t *testing.T) {
 
 }
 
+/*
 func TestCheckouts(t *testing.T) {
 
 	// setup ->

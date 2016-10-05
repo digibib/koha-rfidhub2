@@ -59,6 +59,13 @@ func (c *Client) Run(cfg Config) {
 			case "WRITE":
 			case "CHECKOUT":
 			case "RETRY-ALARM-ON":
+				c.state = RFIDWaitForRetryAlarmOn
+				for k, v := range c.failedAlarmOn {
+					c.current = c.items[k]
+					c.current.Item.Transfer = ""
+					c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOn, Data: []byte(v)})
+					break // Remaining will be triggered in case UNITWaitForRetryAlarmOn
+				}
 			case "RETRY-ALARM-OFF":
 			}
 		case resp := <-c.fromRFID:
@@ -71,6 +78,47 @@ func (c *Client) Run(cfg Config) {
 					break
 				}
 				c.state = RFIDCheckin
+			case RFIDWaitForCheckinAlarmLeave:
+				c.state = RFIDCheckin
+				c.current.Item.Date = ""
+				c.sendToKoha(c.current)
+			case RFIDWaitForCheckinAlarmOn:
+				c.state = RFIDCheckin
+				if !resp.OK {
+					c.current.Item.AlarmOnFailed = true
+					c.current.Item.Status = "Feil: fikk ikke skrudd på alarm."
+				} else {
+					delete(c.failedAlarmOn, c.current.Item.Barcode)
+					c.current.Item.AlarmOnFailed = false
+					c.current.Item.Status = ""
+				}
+				// Discard branchcode if issuing branch is the same as target branch
+				if c.branch == c.current.Item.Transfer {
+					c.current.Item.Transfer = ""
+				}
+				c.sendToKoha(c.current)
+			case RFIDWaitForRetryAlarmOn:
+				if !resp.OK {
+					c.current.Item.AlarmOnFailed = true
+					c.current.Item.Status = "Feil: fikk ikke skrudd på alarm."
+				} else {
+					delete(c.failedAlarmOn, c.current.Item.Barcode)
+					c.current.Item.Status = ""
+					c.current.Item.AlarmOnFailed = false
+				}
+				c.sendToKoha(c.current)
+
+				if len(c.failedAlarmOn) > 0 {
+					for k, v := range c.failedAlarmOn {
+						c.current = c.items[k]
+						c.current.Item.Transfer = ""
+						c.state = RFIDWaitForRetryAlarmOn
+						c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOn, Data: []byte(v)})
+						break
+					}
+				} else {
+					c.state = RFIDCheckin
+				}
 			case RFIDCheckin:
 				var err error
 				if !resp.OK {
@@ -81,7 +129,7 @@ func (c *Client) Run(cfg Config) {
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
 						c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
 						if err != nil {
-							log.Println("ERR [%s] SIP: %v", c.IP, err)
+							log.Printf("ERR [%s] SIP: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CONNECT", SIPError: true, ErrorMessage: err.Error()})
 							c.quit <- true
 							break
@@ -96,7 +144,7 @@ func (c *Client) Run(cfg Config) {
 					// Proceed with checkin transaciton
 					c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse)
 					if err != nil {
-						log.Println("ERR [%s] SIP call failed: %v", c.IP, err)
+						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKIN", SIPError: true, ErrorMessage: err.Error()})
 						// TODO send cmdAlarmLeave to RFID?
 						break
