@@ -7,6 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -21,6 +22,8 @@ type Config struct {
 	SIPPass string
 	SIPDept string
 
+	RFIDTimeout time.Duration
+
 	LogSIPMessages bool
 }
 
@@ -33,12 +36,14 @@ var (
 		SIPUser:        "autouser",
 		SIPPass:        "autopass",
 		LogSIPMessages: true,
+		RFIDTimeout:    15 * time.Minute,
 	}
 
 	hub *Hub
 )
 
 func init() {
+	// TODO move these to command line flags
 	if os.Getenv("TCP_PORT") != "" {
 		config.RFIDPort = os.Getenv("TCP_PORT")
 	}
@@ -62,6 +67,7 @@ func init() {
 }
 
 func main() {
+	flag.DurationVar(&config.RFIDTimeout, "rfid-timeout", 15*time.Minute, "RFID-timeout in Koha UI")
 	flag.Parse()
 	hub = newHub(config)
 	defer hub.Close()

@@ -460,8 +460,8 @@ func (c *Client) readFromKoha() {
 		}
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.conn.SetReadDeadline(time.Now().Add(c.hub.config.RFIDTimeout))
+	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(c.hub.config.RFIDTimeout)); return nil })
 	for {
 		_, jsonMsg, err := c.conn.ReadMessage()
 		if err != nil {
