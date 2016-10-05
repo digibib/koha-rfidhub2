@@ -16,7 +16,7 @@ import (
 )
 
 type dummyRFID struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	ln       net.Listener
 	c        net.Conn
 	incoming chan []byte
@@ -35,6 +35,8 @@ func (d *dummyRFID) reader() {
 }
 
 func (d *dummyRFID) write(msg []byte) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	w := bufio.NewWriter(d.c)
 	_, err := w.Write(msg)
 	if err != nil {
@@ -49,14 +51,6 @@ func (d *dummyRFID) write(msg []byte) {
 }
 
 func (d *dummyRFID) run() {
-	var err error
-	d.mu.Lock()
-	d.ln, err = net.Listen("tcp", ":0")
-	d.mu.Unlock()
-	if err != nil {
-		println(err.Error())
-		panic("Cannot start dummy RFID TCP-server")
-	}
 	defer d.ln.Close()
 	c, err := d.ln.Accept()
 	if err != nil {
@@ -68,8 +62,11 @@ func (d *dummyRFID) run() {
 }
 
 func (d *dummyRFID) addr() string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock()
+	if d.ln == nil {
+		time.Sleep(100)
+	}
+	defer d.mu.RUnlock()
 	addr := "http://" + d.ln.Addr().String()
 	return addr
 }
@@ -88,6 +85,14 @@ func (d *dummyRFID) Close() {
 func newDummyRFIDReader() *dummyRFID {
 	d := dummyRFID{
 		incoming: make(chan []byte),
+	}
+	var err error
+	d.mu.Lock()
+	d.ln, err = net.Listen("tcp", ":0")
+	d.mu.Unlock()
+	if err != nil {
+		println(err.Error())
+		panic("Cannot start dummy RFID TCP-server")
 	}
 	go d.run()
 	return &d
@@ -175,8 +180,6 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 	d := newDummyRFIDReader()
 	defer d.Close()
 
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
-
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
@@ -216,8 +219,6 @@ func TestUnavailableSIPServer(t *testing.T) {
 
 	d := newDummyRFIDReader()
 	defer d.Close()
-
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
@@ -269,8 +270,6 @@ func TestCheckins(t *testing.T) {
 
 	d := newDummyRFIDReader()
 	defer d.Close()
-
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
@@ -432,8 +431,6 @@ func TestCheckouts(t *testing.T) {
 	d := newDummyRFIDReader()
 	defer d.Close()
 
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
-
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
@@ -567,8 +564,6 @@ func TestBarcodesSession(t *testing.T) {
 	d := newDummyRFIDReader()
 	defer d.Close()
 
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
-
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
@@ -622,8 +617,6 @@ func TestWriteLogic(t *testing.T) {
 
 	d := newDummyRFIDReader()
 	defer d.Close()
-
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
 	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
@@ -770,8 +763,6 @@ func TestWriteLogic(t *testing.T) {
 
 }
 
-/*
-
 func TestUserErrors(t *testing.T) {
 
 	// setup ->
@@ -786,56 +777,51 @@ func TestUserErrors(t *testing.T) {
 	d := newDummyRFIDReader()
 	defer d.Close()
 
-	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
-
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
 	defer a.c.Close()
-
+	time.Sleep(50)
 	// <- end setup
 
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
+		t.Fatal("RFID-unit didn't get version init command")
+	}
 	d.write([]byte("OK\r"))
+	<-uiChan // CONNECT OK
 
-	<-uiChan
-
-	err := a.c.WriteMessage(websocket.TextMessage,
-		[]byte(`{"Action":"BLA", "this is not well formed json }`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage,
+		[]byte(`{"Action":"BLA", "this is not well formed json }`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	Message := <-uiChan
+	got := <-uiChan
 	want := Message{Action: "CONNECT", UserError: true,
-		ErrorMessage: "Failed to parse the JSON request: unexpected end of JSON input"}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+		ErrorMessage: "unexpected end of JSON input"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 	}
 
 	// Attemp CHECKOUT without sending the patron barcode
-	err = a.c.WriteMessage(websocket.TextMessage,
-		[]byte(`{"Action":"CHECKOUT"}`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage,
+		[]byte(`{"Action":"CHECKOUT"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKOUT", UserError: true,
 		ErrorMessage: "Patron not supplied"}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 	}
 
 }
-
-*/
 
 /*
 // Verify that if a second websocket connection is opened from the same IP,

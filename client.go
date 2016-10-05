@@ -466,7 +466,8 @@ func (c *Client) readFromKoha() {
 		}
 		var msg Message
 		if err := json.Unmarshal(jsonMsg, &msg); err != nil {
-			log.Println("ERR [%s] unmarshal message: %v", c.IP, err)
+			log.Printf("ERR [%s] unmarshal message: %v", c.IP, err)
+			c.sendToKoha(Message{Action: "CONNECT", UserError: true, ErrorMessage: err.Error()})
 			continue
 		}
 		c.fromKoha <- msg
