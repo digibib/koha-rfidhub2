@@ -1,18 +1,39 @@
 package main
 
-import "sync"
+import (
+	"net/http"
+	"sync"
+)
 
 // Hub maintains the set of connected clients, to make sure we only have one per IP.
 type Hub struct {
 	mu          sync.Mutex         // Protects the following:
 	clients     map[*Client]bool   // Connected clients
 	clientsByIP map[string]*Client // Connected clients keyed by IP-address
+	config      Config
 }
 
-func newHub() *Hub {
+func newHub(cfg Config) *Hub {
 	return &Hub{
 		clients:     make(map[*Client]bool),
 		clientsByIP: make(map[string]*Client),
+		config:      cfg,
+	}
+}
+
+func (h *Hub) Serve() error {
+	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(h, w, r)
+	})
+	return http.ListenAndServe(":"+config.HTTPPort, nil)
+}
+
+func (h *Hub) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.clients {
+		c.quit <- true
 	}
 }
 

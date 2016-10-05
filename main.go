@@ -85,13 +85,9 @@ func init() {
 
 func main() {
 	flag.Parse()
-	hub := newHub()
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
-	})
-	if err := http.ListenAndServe(*addr, nil); err != nil {
-		log.Fatal("http.ListenAndServe: ", err)
+	hub := newHub(config)
+	if err := hub.Serve(); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -123,6 +119,6 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		rfid:     newRFIDManager(),
 	}
 	hub.Connect(client)
-	go client.Run(config)
+	go client.Run(hub.config)
 	client.readFromKoha()
 }
