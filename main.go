@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"text/template"
 
+	pool "gopkg.in/fatih/pool.v2"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -41,10 +43,10 @@ var (
 	}
 
 	// TODO remove:
-	addr         = flag.String("addr", ":8899", "http service address")
 	homeTemplate = template.Must(template.ParseFiles("test.html"))
 
-	hub *Hub
+	hub     *Hub
+	sipPool pool.Pool
 )
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +97,7 @@ func main() {
 	flag.Parse()
 	hub = newHub(config)
 	defer hub.Close()
+
 	log.Fatal(http.ListenAndServe(":"+config.HTTPPort, nil))
 }
 
@@ -116,14 +119,17 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := &Client{
-		IP:       ip,
-		hub:      hub,
-		conn:     conn,
-		fromKoha: make(chan Message),
-		fromRFID: make(chan RFIDResp),
-		quit:     make(chan bool, 5),
-		readBuf:  make([]byte, 1024),
-		rfid:     newRFIDManager(),
+		IP:             ip,
+		hub:            hub,
+		conn:           conn,
+		fromKoha:       make(chan Message),
+		fromRFID:       make(chan RFIDResp),
+		quit:           make(chan bool, 5),
+		readBuf:        make([]byte, 1024),
+		rfid:           newRFIDManager(),
+		items:          make(map[string]Message),
+		failedAlarmOn:  make(map[string]string),
+		failedAlarmOff: make(map[string]string),
 	}
 	hub.Connect(client)
 	go client.Run(hub.config)

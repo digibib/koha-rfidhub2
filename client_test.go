@@ -188,8 +188,7 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 
 	// <- end setup
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 
@@ -203,7 +202,6 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 	}
 }
 
-/*
 func TestUnavailableSIPServer(t *testing.T) {
 	// Setup: ->
 
@@ -219,13 +217,12 @@ func TestUnavailableSIPServer(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -233,8 +230,7 @@ func TestUnavailableSIPServer(t *testing.T) {
 
 	// <- end setup
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 	d.write([]byte("OK\r"))
@@ -242,21 +238,24 @@ func TestUnavailableSIPServer(t *testing.T) {
 	if err := a.c.WriteMessage(websocket.TextMessage, []byte(`{"Action":"CHECKIN"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
-	msg = <-d.incoming
-	if string(msg) != "BEG\r" {
+
+	if msg := <-d.incoming; string(msg) != "BEG\r" {
 		t.Fatal("UI -> CHECKIN: RFID-unit didn't get instructed to start scanning")
 	}
 	d.write([]byte("OK\r"))
 	d.write([]byte("RDT1003010824124004:NO:02030000|1\r"))
 
-	Message := <-uiChan
+	got := <-uiChan
+	got.ErrorMessage = "" // No way to know the os-assigned port number in error message
 	want := Message{Action: "CONNECT", SIPError: true}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get notified of SIP error")
 	}
 
 }
+
+/*
 
 func TestCheckins(t *testing.T) {
 	// Setup: ->
