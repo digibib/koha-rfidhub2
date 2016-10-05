@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -65,12 +66,48 @@ func (c *Client) initRFID(port string) {
 	var err error
 	c.rfidconn, err = net.Dial("tcp", net.JoinHostPort(c.IP, port))
 	if err != nil {
-		log.Printf("ERR [%v] RFID server tcp connect: %v", c.IP, err)
+		log.Printf("ERR [%s] RFID server tcp connect: %v", c.IP, err)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 		c.quit <- true
 		return
 	}
-	// TODO send init commands
+	// Init the RFID-unit with version command
+	var initError string
+	req := c.rfid.GenRequest(RFIDReq{Cmd: cmdInitVersion})
+	_, err = c.rfidconn.Write(req)
+	if err != nil {
+		initError = err.Error()
+	}
+	log.Printf("-> [%s] %q", c.IP, string(req))
+
+	r := bufio.NewReader(c.rfidconn)
+	n, err := r.Read(c.readBuf)
+	if err != nil {
+		initError = err.Error()
+	}
+	resp, err := c.rfid.ParseResponse(c.readBuf[:n])
+	if err != nil {
+		initError = err.Error()
+	}
+	log.Printf("<- [%s] %q", c.IP, string(c.readBuf[:n]))
+
+	if initError == "" && !resp.OK {
+		initError = "RFID-unit responded with NOK"
+	}
+
+	if initError != "" {
+		log.Printf("ERR [%s] RFID initialization: %s", c.IP, initError)
+		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: initError})
+		c.quit <- true
+		return
+	}
+
+	log.Printf("[%s] RIFD connected & initialized", c.IP)
+
+	go c.readFromRFID(r)
+
+	// Notify UI of success:
+	c.sendToKoha(Message{Action: "CONNECT"})
 }
 
 func (c *Client) readFromKoha() {
@@ -114,8 +151,7 @@ func (c *Client) sendToKoha(msg Message) {
 	}
 }
 
-func (c *Client) readFromRFID() {
-	r := bufio.NewReader(c.rfidconn)
+func (c *Client) readFromRFID(r io.Reader) {
 	for {
 		n, err := r.Read(c.readBuf)
 		if err != nil {
