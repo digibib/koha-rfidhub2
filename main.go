@@ -7,7 +7,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,22 +21,18 @@ type Config struct {
 	SIPPass string
 	SIPDept string
 
-	// Number of SIP-connections to keep in the pool
-	NumSIPConnections int
-
 	LogSIPMessages bool
 }
 
 // global variables
 var (
 	config = Config{
-		RFIDPort:          "6005",
-		HTTPPort:          "8899",
-		SIPServer:         "sip_proxy:9999",
-		SIPUser:           "autouser",
-		SIPPass:           "autopass",
-		NumSIPConnections: 10,
-		LogSIPMessages:    true,
+		RFIDPort:       "6005",
+		HTTPPort:       "8899",
+		SIPServer:      "sip_proxy:9999",
+		SIPUser:        "autouser",
+		SIPPass:        "autopass",
+		LogSIPMessages: true,
 	}
 
 	hub *Hub
@@ -58,13 +53,6 @@ func init() {
 	}
 	if os.Getenv("SIP_PASS") != "" {
 		config.SIPPass = os.Getenv("SIP_PASS")
-	}
-	if os.Getenv("SIP_CONNS") != "" {
-		n, err := strconv.Atoi(os.Getenv("SIP_CONNS"))
-		if err != nil {
-			log.Fatal(err)
-		}
-		config.NumSIPConnections = n
 	}
 
 	// TODO move somewhere else

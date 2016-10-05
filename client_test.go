@@ -146,10 +146,9 @@ func TestMissingRFIDUnit(t *testing.T) {
 	defer srv.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          "12346", // not listening
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  "12346", // not listening
 	})
 	defer hub.Close()
 
@@ -181,10 +180,9 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
@@ -221,10 +219,9 @@ func TestUnavailableSIPServer(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
@@ -272,10 +269,9 @@ func TestCheckins(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
@@ -432,11 +428,10 @@ func TestCheckouts(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
-		LogSIPMessages:    true,
+		HTTPPort:       port(srv.URL),
+		SIPServer:      sipSrv.Addr(),
+		RFIDPort:       port(d.addr()),
+		LogSIPMessages: true,
 	})
 	defer hub.Close()
 
@@ -565,10 +560,9 @@ func TestBarcodesSession(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
@@ -619,10 +613,9 @@ func TestWriteLogic(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
@@ -778,10 +771,9 @@ func TestUserErrors(t *testing.T) {
 	defer d.Close()
 
 	hub = newHub(Config{
-		HTTPPort:          port(srv.URL),
-		SIPServer:         sipSrv.Addr(),
-		RFIDPort:          port(d.addr()),
-		NumSIPConnections: 1,
+		HTTPPort:  port(srv.URL),
+		SIPServer: sipSrv.Addr(),
+		RFIDPort:  port(d.addr()),
 	})
 	defer hub.Close()
 
