@@ -75,6 +75,8 @@ func (d *dummyRFID) addr() string {
 }
 
 func (d *dummyRFID) Close() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.c != nil {
 		d.c.Close()
 	}

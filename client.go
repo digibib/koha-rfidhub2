@@ -395,7 +395,9 @@ func (c *Client) Run(cfg Config) {
 				// TODO default case -> ERROR
 			}
 		case <-c.quit:
+			c.wlock.Lock()
 			c.write(websocket.CloseMessage, []byte{})
+			c.wlock.Unlock()
 			return
 		}
 	}

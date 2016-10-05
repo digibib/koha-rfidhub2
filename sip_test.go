@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"net"
+	"sync"
 	"testing"
 
 	"gopkg.in/fatih/pool.v2"
 )
 
 type SIPTestServer struct {
+	sync.RWMutex
 	l       net.Listener
 	echo    []byte
 	auth    bool
@@ -32,10 +34,13 @@ func (s *SIPTestServer) run() {
 			return
 		}
 		defer conn.Close()
+		s.RLock()
 		if s.failing {
 			conn.Close()
+			s.RUnlock()
 			return
 		}
+		s.RUnlock()
 		r := bufio.NewReader(conn)
 		for {
 			_, _ = r.ReadBytes('\r')
@@ -54,10 +59,20 @@ func (s *SIPTestServer) run() {
 
 }
 
-func (s *SIPTestServer) Respond(msg string) { s.echo = []byte(msg) }
-func (s *SIPTestServer) Addr() string       { return s.l.Addr().String() }
-func (s *SIPTestServer) Close()             { s.l.Close() }
+func (s *SIPTestServer) Respond(msg string) {
+	s.Lock()
+	defer s.Unlock()
+	s.echo = []byte(msg)
+}
+func (s *SIPTestServer) Addr() string {
+	s.RLock()
+	defer s.RUnlock()
+	return s.l.Addr().String()
+}
+func (s *SIPTestServer) Close() { s.l.Close() }
 func (s *SIPTestServer) Failing() *SIPTestServer {
+	s.Lock()
+	defer s.Unlock()
 	s.failing = true
 	return s
 }
