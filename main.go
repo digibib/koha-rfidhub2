@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"strconv"
-	"strings"
 	"text/template"
 
 	"github.com/gorilla/websocket"
@@ -107,21 +107,22 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		log.Println("ERR cannot get remote IP address: %v", err)
+		return
+	}
 	client := &Client{
-		IP:       remoteAddrIP(r.RemoteAddr),
+		IP:       ip,
 		hub:      hub,
 		conn:     conn,
 		fromKoha: make(chan Message),
-		quit:     make(chan bool),
+		fromRFID: make(chan RFIDResp),
+		quit:     make(chan bool, 5),
+		readBuf:  make([]byte, 1024),
+		rfid:     newRFIDManager(),
 	}
 	hub.Connect(client)
-	go client.Run()
-	client.reader()
-}
-
-func remoteAddrIP(addr string) string {
-	if i := strings.Index(addr, ":"); i != -1 {
-		return addr[0:i]
-	}
-	return addr
+	go client.Run(config)
+	client.readFromKoha()
 }

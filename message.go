@@ -9,10 +9,10 @@ type Message struct {
 	SIPError     bool   // true if SIP-server is unavailable
 	UserError    bool   // true if user is not using the API correctly
 	ErrorMessage string // textual description of the error
-	Item         item   // current item in focus (checked in, out etc.)
+	Item         Item   // current item in focus (checked in, out etc.)
 }
 
-type item struct {
+type Item struct {
 	Biblionr   string
 	Borrowernr string
 	Label      string

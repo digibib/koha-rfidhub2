@@ -12,29 +12,29 @@ type RFIDState int
 
 // Possible RFIDStates
 const (
-	UNITIdle RFIDState = iota
-	UNITCheckinWaitForBegOK
-	UNITCheckin
-	UNITCheckout
-	UNITCheckoutWaitForBegOK
-	UNITWaitForCheckinAlarmOn
-	UNITWaitForCheckinAlarmLeave
-	UNITWaitForCheckoutAlarmOff
-	UNITWaitForCheckoutAlarmLeave
-	UNITPreWriteStep1
-	UNITPreWriteStep2
-	UNITPreWriteStep3
-	UNITPreWriteStep4
-	UNITPreWriteStep5
-	UNITPreWriteStep6
-	UNITPreWriteStep7
-	UNITPreWriteStep8
-	UNITWriting
-	UNITWaitForTagCount
-	UNITWaitForRetryAlarmOn
-	UNITWaitForRetryAlarmOff
-	UNITOff
-	UNITWaitForEndOK
+	RFIDIdle RFIDState = iota
+	RFIDCheckinWaitForBegOK
+	RFIDCheckin
+	RFIDCheckout
+	RFIDCheckoutWaitForBegOK
+	RFIDWaitForCheckinAlarmOn
+	RFIDWaitForCheckinAlarmLeave
+	RFIDWaitForCheckoutAlarmOff
+	RFIDWaitForCheckoutAlarmLeave
+	RFIDPreWriteStep1
+	RFIDPreWriteStep2
+	RFIDPreWriteStep3
+	RFIDPreWriteStep4
+	RFIDPreWriteStep5
+	RFIDPreWriteStep6
+	RFIDPreWriteStep7
+	RFIDPreWriteStep8
+	RFIDWriting
+	RFIDWaitForTagCount
+	RFIDWaitForRetryAlarmOn
+	RFIDWaitForRetryAlarmOff
+	RFIDOff
+	RFIDWaitForEndOK
 )
 
 type RFIDCommand int

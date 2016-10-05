@@ -1,10 +1,6 @@
 package main
 
-import (
-	"sync"
-
-	"github.com/gorilla/websocket"
-)
+import "sync"
 
 // Hub maintains the set of connected clients, to make sure we only have one per IP.
 type Hub struct {
@@ -26,8 +22,7 @@ func (h *Hub) Connect(c *Client) {
 	if old, ok := h.clientsByIP[c.IP]; ok {
 		// There is allready a connection from the same IP, disconnect it.
 		delete(h.clients, old)
-		close(old.quit)
-		old.write(websocket.CloseMessage, []byte{})
+		old.quit <- true
 	}
 	h.clients[c] = true
 	h.clientsByIP[c.IP] = c
@@ -38,8 +33,7 @@ func (h *Hub) Disconnect(c *Client) {
 	defer h.mu.Unlock()
 	if _, ok := h.clients[c]; ok {
 		delete(h.clients, c)
-		close(c.quit)
-		c.write(websocket.CloseMessage, []byte{})
+		c.quit <- true
 		delete(h.clientsByIP, c.IP)
 	}
 }

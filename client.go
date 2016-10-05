@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,25 +28,52 @@ type Client struct {
 	IP       string
 	hub      *Hub
 	conn     *websocket.Conn
+	rfidconn net.Conn
+	rfid     *RFIDManager
+	readBuf  []byte
 	fromKoha chan Message
+	fromRFID chan RFIDResp
 	quit     chan bool
 }
 
 // Run the state-machine of the client
-func (c *Client) Run() {
+func (c *Client) Run(cfg Config) {
+	go c.initRFID(cfg.RFIDPort)
 	for {
 		select {
 		case msg := <-c.fromKoha:
-			fmt.Printf("Got from Koha: %v", msg)
+			switch msg.Action {
+			case "CHECKIN":
+				c.state = RFIDCheckinWaitForBegOK
+			case "END":
+				c.state = RFIDWaitForEndOK
+			case "ITEM-INFO":
+			case "WRITE":
+			case "CHECKOUT":
+			case "RETRY-ALARM-ON":
+			case "RETRY-ALARM-OFF":
+			}
 		//case msg := <-c.fromRFID:
 		case <-c.quit:
+			c.write(websocket.CloseMessage, []byte{})
 			return
 		}
 	}
 }
 
-// reader pumps messages from the UI websocket to the client.
-func (c *Client) reader() {
+func (c *Client) initRFID(port string) {
+	var err error
+	c.rfidconn, err = net.Dial("tcp", net.JoinHostPort(c.IP, port))
+	if err != nil {
+		log.Printf("ERR [%v] RFID server tcp connect: %v", c.IP, err)
+		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
+		c.quit <- true
+		return
+	}
+	// TODO send init commands
+}
+
+func (c *Client) readFromKoha() {
 	defer func() {
 		c.hub.Disconnect(c)
 		c.conn.Close()
@@ -75,7 +104,7 @@ func (c *Client) sendToKoha(msg Message) {
 	}
 	b, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("sendToKoha json.Marshal(msg): %v", err)
+		log.Printf("ERR sendToKoha json.Marshal(msg): %v", err)
 		return
 	}
 	w.Write(b)
@@ -83,4 +112,39 @@ func (c *Client) sendToKoha(msg Message) {
 	if err := w.Close(); err != nil {
 		return
 	}
+}
+
+func (c *Client) readFromRFID() {
+	r := bufio.NewReader(c.rfidconn)
+	for {
+		n, err := r.Read(c.readBuf)
+		if err != nil {
+			log.Printf("[%v] RFID server tcp read failed: %v", c.IP, err)
+			c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
+			c.quit <- true
+			break
+		}
+		log.Printf("<- [%v] %q", c.IP, string(c.readBuf[:n]))
+
+		resp, err := c.rfid.ParseResponse(c.readBuf[:n])
+		if err != nil {
+			log.Printf("ERR [%v] %v", c.IP, err)
+			c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
+			c.quit <- true // TODO really?
+			break
+		}
+		c.fromRFID <- resp
+	}
+}
+
+func (c *Client) sendToRFID(req RFIDReq) {
+	b := c.rfid.GenRequest(req)
+	_, err := c.rfidconn.Write(b)
+	if err != nil {
+		log.Printf("ERR [%v] %v", c.IP, err)
+		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
+		c.quit <- true
+		return
+	}
+	log.Printf("-> [%v] %q", c.IP, string(b))
 }

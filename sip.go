@@ -169,7 +169,7 @@ func checkinParse(msg sip.Message) Message {
 
 	return Message{
 		Action: "CHECKIN",
-		Item: item{
+		Item: Item{
 			Hold:              hold,
 			Transfer:          branch,
 			Unknown:           unknown,
@@ -204,7 +204,7 @@ func checkoutParse(msg sip.Message) Message {
 	}
 
 	return Message{
-		Item: item{
+		Item: Item{
 			Unknown:           unknown,
 			TransactionFailed: fail,
 			Barcode:           msg.Field(sip.FieldItemIdentifier),
@@ -227,7 +227,7 @@ func itemStatusParse(msg sip.Message) Message {
 	}
 
 	return Message{
-		Item: item{
+		Item: Item{
 			TransactionFailed: true,
 			Barcode:           msg.Field(sip.FieldItemIdentifier),
 			Status:            status,
