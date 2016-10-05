@@ -43,6 +43,8 @@ var (
 	// TODO remove:
 	addr         = flag.String("addr", ":8899", "http service address")
 	homeTemplate = template.Must(template.ParseFiles("test.html"))
+
+	hub *Hub
 )
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
@@ -81,14 +83,19 @@ func init() {
 		}
 		config.NumSIPConnections = n
 	}
+
+	// TODO move somewhere else
+	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, w, r)
+	})
 }
 
 func main() {
 	flag.Parse()
-	hub := newHub(config)
-	if err := hub.Serve(); err != nil {
-		log.Fatal(err)
-	}
+	hub = newHub(config)
+	defer hub.Close()
+	log.Fatal(http.ListenAndServe(":"+config.HTTPPort, nil))
 }
 
 var upgrader = websocket.Upgrader{

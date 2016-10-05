@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -137,13 +138,12 @@ func TestMissingRFIDUnit(t *testing.T) {
 	srv := httptest.NewServer(nil)
 	defer srv.Close()
 
-	hub := newHub(Config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
 		RFIDPort:          "12346", // not listening
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -158,10 +158,8 @@ func TestMissingRFIDUnit(t *testing.T) {
 		t.Errorf("Got %+v; want %+v", msg, want)
 		t.Fatal("UI didn't get notified of failed RFID connect")
 	}
-
 }
 
-/*
 func TestRFIDUnitInitVersionFailure(t *testing.T) {
 	// Setup: ->
 
@@ -177,13 +175,12 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -198,14 +195,15 @@ func TestRFIDUnitInitVersionFailure(t *testing.T) {
 
 	d.write([]byte("NOK\r"))
 
-	Message := <-uiChan
-	want := Message{Action: "CONNECT", RFIDError: true}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	got := <-uiChan
+	want := Message{Action: "CONNECT", RFIDError: true, ErrorMessage: "RFID-unit responded with NOK"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get notified of failed RFID connect")
 	}
 }
 
+/*
 func TestUnavailableSIPServer(t *testing.T) {
 	// Setup: ->
 
@@ -224,10 +222,10 @@ func TestUnavailableSIPServer(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -278,10 +276,10 @@ func TestCheckins(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -448,10 +446,10 @@ func TestCheckouts(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -587,10 +585,10 @@ func TestBarcodesSession(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -648,10 +646,10 @@ func TestWriteLogic(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -825,10 +823,10 @@ func TestUserErrors(t *testing.T) {
 	hub = newHub(config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		TCPPort:           port(d.addr()),
+		RFIDPort:           port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.run()
+	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))

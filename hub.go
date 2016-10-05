@@ -1,9 +1,6 @@
 package main
 
-import (
-	"net/http"
-	"sync"
-)
+import "sync"
 
 // Hub maintains the set of connected clients, to make sure we only have one per IP.
 type Hub struct {
@@ -19,14 +16,6 @@ func newHub(cfg Config) *Hub {
 		clientsByIP: make(map[string]*Client),
 		config:      cfg,
 	}
-}
-
-func (h *Hub) Serve() error {
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(h, w, r)
-	})
-	return http.ListenAndServe(":"+config.HTTPPort, nil)
 }
 
 func (h *Hub) Close() {
