@@ -343,7 +343,6 @@ func TestCheckins(t *testing.T) {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	println("blocking?")
 	if msg := <-d.incoming; string(msg) != "ACT1003010824124004:NO:02030000\r" {
 		t.Fatal("UI -> RETRY-ALARM-ON didn't trigger the right RFID command")
 	}
@@ -417,7 +416,6 @@ func TestCheckins(t *testing.T) {
 
 }
 
-/*
 func TestCheckouts(t *testing.T) {
 
 	// setup ->
@@ -434,13 +432,13 @@ func TestCheckouts(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
+		LogSIPMessages:    true,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -450,28 +448,27 @@ func TestCheckouts(t *testing.T) {
 
 	// TESTS /////////////////////////////////////////////////////////////////
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 	d.write([]byte("OK\r"))
 
-	Message := <-uiChan
+	got := <-uiChan
 	want := Message{Action: "CONNECT"}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get notified of succesfull rfid connect")
 	}
 
 	// Send "CHECKOUT" message from UI and verify that the UI gets notified of
 	// succesfull connect & RFID-unit that gets instructed to starts scanning for tags.
-	err := a.c.WriteMessage(websocket.TextMessage, []byte(`{"Action":"CHECKOUT", "Patron": "95", "Branch":"hutl"}`))
-	if err != nil {
+	if err := a.c.WriteMessage(
+		websocket.TextMessage,
+		[]byte(`{"Action":"CHECKOUT", "Patron": "95", "Branch":"hutl"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "BEG\r" {
+	if msg := <-d.incoming; string(msg) != "BEG\r" {
 		t.Fatal("UI -> CHECKOUT: RFID-unit didn't get instructed to start scanning")
 	}
 
@@ -483,23 +480,22 @@ func TestCheckouts(t *testing.T) {
 	sipSrv.Respond("120NUN20140303    102741AOHUTL|AA95|AB03011174511003|AJKrutt-Kim|AH|AFItem checked out to another patron|BLY|\r")
 	d.write([]byte("RDT1003011174511003:NO:02030000|0\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "OK \r" {
+	if msg := <-d.incoming; string(msg) != "OK \r" {
 		t.Errorf("Alarm was changed after unsuccessful checkout")
 	}
 
 	d.write([]byte("OK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKOUT",
-		Item: item{
+		Item: Item{
 			Label:             "Krutt-Kim",
 			Barcode:           "03011174511003",
 			TransactionFailed: true,
 			Status:            "Item checked out to another patron",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message when item is allready checked out to another patron")
 	}
 
@@ -507,55 +503,55 @@ func TestCheckouts(t *testing.T) {
 	sipSrv.Respond("121NNY20140303    110236AOHUTL|AA95|AB03011063175001|AJCat's cradle|AH20140331    235900|\r")
 	d.write([]byte("RDT1003011063175001:NO:02030000|0\r"))
 
-	msg = <-d.incoming
-	if string(msg) != "OK0\r" {
+	if msg := <-d.incoming; string(msg) != "OK0\r" {
 		t.Errorf("Alarm was not turned off after successful checkout")
 	}
 
 	// simulate failed alarm
 	d.write([]byte("NOK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKOUT",
-		Item: item{
+		Item: Item{
 			Label:          "Cat's cradle",
 			Barcode:        "03011063175001",
 			Date:           "03/03/2014",
 			AlarmOffFailed: true,
 			Status:         "Feil: fikk ikke skrudd av alarm.",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message after succesfull checkout")
 	}
 
 	// retry alarm off
-	err = a.c.WriteMessage(websocket.TextMessage, []byte(`{"Action":"RETRY-ALARM-OFF"}`))
-	if err != nil {
+	if err := a.c.WriteMessage(
+		websocket.TextMessage, []byte(`{"Action":"RETRY-ALARM-OFF"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
-	msg = <-d.incoming
-	if string(msg) != "DAC1003011063175001:NO:02030000\r" {
+	if msg := <-d.incoming; string(msg) != "DAC1003011063175001:NO:02030000\r" {
 		t.Errorf("Got %q, Want DAC1003011063175001:NO:02030000", msg)
 		t.Fatal("UI -> RETRY-ALARM-ON didn't trigger the right RFID command")
 	}
 
 	d.write([]byte("OK\r"))
 
-	Message = <-uiChan
+	got = <-uiChan
 	want = Message{Action: "CHECKOUT",
-		Item: item{
+		Item: Item{
 			Label:   "Cat's cradle",
 			Barcode: "03011063175001",
 			Date:    "03/03/2014",
 		}}
-	if !reflect.DeepEqual(Message, want) {
-		t.Errorf("Got %+v; want %+v", Message, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %+v; want %+v", got, want)
 		t.Fatal("UI didn't get the correct message after succesfull checkout")
 	}
 
 }
+
+/*
 
 // Test that rereading of items with missing tags doesn't trigger multiple SIP-calls
 func TestBarcodesSession(t *testing.T) {

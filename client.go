@@ -26,6 +26,7 @@ const (
 type Client struct {
 	state          RFIDState
 	branch         string
+	patron         string
 	current        Message
 	items          map[string]Message // Keep items around for retries, keyed by barcode TODO drop Message, store only Item
 	failedAlarmOn  map[string]string  // map[Barcode]Tag
@@ -55,18 +56,37 @@ func (c *Client) Run(cfg Config) {
 				c.sendToRFID(RFIDReq{Cmd: cmdBeginScan})
 			case "END":
 				c.state = RFIDWaitForEndOK
+				c.sendToRFID(RFIDReq{Cmd: cmdEndScan})
 			case "ITEM-INFO":
 			case "WRITE":
 			case "CHECKOUT":
+				if msg.Patron == "" {
+					c.sendToKoha(Message{Action: "CHECKOUT",
+						UserError: true, ErrorMessage: "Patron not supplied"})
+					c.state = RFIDIdle
+					break
+				}
+				c.state = RFIDCheckoutWaitForBegOK
+				c.patron = msg.Patron
+				c.branch = msg.Branch
+				c.rfid.Reset()
+				c.sendToRFID(RFIDReq{Cmd: cmdBeginScan})
 			case "RETRY-ALARM-ON":
 				c.state = RFIDWaitForRetryAlarmOn
 				for k, v := range c.failedAlarmOn {
 					c.current = c.items[k]
 					c.current.Item.Transfer = ""
 					c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOn, Data: []byte(v)})
-					break // Remaining will be triggered in case UNITWaitForRetryAlarmOn
+					break // Remaining will be triggered in case RFIDWaitForRetryAlarmOn
 				}
 			case "RETRY-ALARM-OFF":
+				c.state = RFIDWaitForRetryAlarmOff
+				for k, v := range c.failedAlarmOff {
+					c.current = c.items[k]
+					c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOff, Data: []byte(v)})
+					break // Remaining will be triggered in case UNITWaitForRetryAlarmOff
+				}
+				// TODO default case -> ERROR
 			}
 		case resp := <-c.fromRFID:
 			switch c.state {
@@ -158,6 +178,97 @@ func (c *Client) Run(cfg Config) {
 						c.sendToRFID(RFIDReq{Cmd: cmdAlarmOn})
 						c.state = RFIDWaitForCheckinAlarmOn
 					}
+				}
+			case RFIDCheckout:
+				var err error
+				if !resp.OK {
+					// Missing tags case
+					// TODO test this case
+
+					// Get status of item, to have title to display on screen,
+					// Don't bother calling SIP if this is allready the current item
+					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
+						c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
+						if err != nil {
+							log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
+							c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
+							// c.quit <- true // really?
+							break
+						}
+					}
+					c.current.Action = "CHECKOUT"
+					c.items[stripLeading10(resp.Barcode)] = c.current
+					c.sendToRFID(RFIDReq{Cmd: cmdAlarmLeave})
+					c.state = RFIDWaitForCheckoutAlarmLeave
+				} else {
+					// proced with checkout transaction
+					c.current, err = DoSIPCall(c.hub.config, sipPool, sipFormMsgCheckout(c.branch, c.patron, resp.Barcode), checkoutParse)
+					if err != nil {
+						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
+						c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
+						// c.quit <- true // really?
+						break
+					}
+					c.current.Action = "CHECKOUT"
+					if c.current.Item.Unknown || c.current.Item.TransactionFailed {
+						c.sendToRFID(RFIDReq{Cmd: cmdAlarmLeave})
+						c.state = RFIDWaitForCheckoutAlarmLeave
+						break
+					} else {
+						c.items[stripLeading10(resp.Barcode)] = c.current
+						c.failedAlarmOff[stripLeading10(resp.Barcode)] = resp.Tag // Store tag id for potential retry
+						c.sendToRFID(RFIDReq{Cmd: cmdAlarmOff})
+						c.state = RFIDWaitForCheckoutAlarmOff
+					}
+				}
+			case RFIDCheckoutWaitForBegOK:
+				if !resp.OK {
+					log.Printf("ERR [%v] RFID failed to start scanning, shutting down.", c.IP)
+					c.sendToKoha(Message{Action: "CHECKOUT", RFIDError: true})
+					c.quit <- true // really?
+					break
+				}
+				c.state = RFIDCheckout
+			case RFIDWaitForCheckoutAlarmOff:
+				c.state = RFIDCheckout
+				if !resp.OK {
+					// TODO unit-test for this
+					c.current.Item.AlarmOffFailed = true
+					c.current.Item.Status = "Feil: fikk ikke skrudd av alarm."
+				} else {
+					delete(c.failedAlarmOff, c.current.Item.Barcode)
+					c.current.Item.Status = ""
+					c.current.Item.AlarmOffFailed = false
+				}
+				c.sendToKoha(c.current)
+			case RFIDWaitForCheckoutAlarmLeave:
+				if !resp.OK {
+					// I can't imagine the RFID-reader fails to leave the
+					// alarm in it current state. In any case, we continue
+					log.Printf("ERR [%v] RFID reader failed to leave alarm in current state", c.IP)
+				}
+				c.state = RFIDCheckout
+				c.sendToKoha(c.current)
+			case RFIDWaitForRetryAlarmOff:
+				if !resp.OK {
+					c.current.Item.AlarmOffFailed = true
+					c.current.Item.Status = "Feil: fikk ikke skrudd av alarm."
+				} else {
+					delete(c.failedAlarmOff, c.current.Item.Barcode)
+					c.current.Item.Status = ""
+					c.current.Item.AlarmOffFailed = false
+				}
+				c.sendToKoha(c.current)
+
+				if len(c.failedAlarmOff) > 0 {
+					for k, v := range c.failedAlarmOff {
+						c.current = c.items[k]
+						c.state = RFIDWaitForCheckoutAlarmOff
+						c.sendToRFID(RFIDReq{Cmd: cmdRetryAlarmOff, Data: []byte(v)})
+						break
+					}
+				} else {
+					c.state = RFIDCheckin
 				}
 			}
 		case <-c.quit:
