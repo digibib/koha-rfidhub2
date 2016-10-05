@@ -11,7 +11,6 @@ type SIPTestServer struct {
 	sync.RWMutex
 	l       net.Listener
 	echo    []byte
-	auth    bool
 	failing bool
 }
 
@@ -25,13 +24,33 @@ func newSIPTestServer() *SIPTestServer {
 	return &s
 }
 
+func (s *SIPTestServer) handle(conn net.Conn) {
+	defer conn.Close()
+	r := bufio.NewReader(conn)
+	auth := false
+	for {
+		_, _ = r.ReadBytes('\r')
+		msg := s.echo
+		if !auth {
+			msg = []byte("941\r")
+		}
+		_, err := conn.Write(msg)
+		if err != nil {
+			break
+		}
+		if auth {
+			return
+		}
+		auth = true
+	}
+}
 func (s *SIPTestServer) run() {
 	for {
 		conn, err := s.l.Accept()
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+
 		s.RLock()
 		if s.failing {
 			conn.Close()
@@ -39,22 +58,8 @@ func (s *SIPTestServer) run() {
 			return
 		}
 		s.RUnlock()
-		r := bufio.NewReader(conn)
-		for {
-			_, _ = r.ReadBytes('\r')
-			msg := s.echo
-			if !s.auth {
-				msg = []byte("941\r")
-			}
-			_, err = conn.Write(msg)
-			if err != nil {
-				panic(err)
-			}
-			s.auth = true
-		}
-
+		go s.handle(conn)
 	}
-
 }
 
 func (s *SIPTestServer) Respond(msg string) {
