@@ -551,8 +551,6 @@ func TestCheckouts(t *testing.T) {
 
 }
 
-/*
-
 // Test that rereading of items with missing tags doesn't trigger multiple SIP-calls
 func TestBarcodesSession(t *testing.T) {
 	// setup ->
@@ -569,13 +567,12 @@ func TestBarcodesSession(t *testing.T) {
 
 	time.Sleep(50) // make sure rfidreader has got designated a port and is listening
 
-	hub = newHub(config{
+	hub = newHub(Config{
 		HTTPPort:          port(srv.URL),
 		SIPServer:         sipSrv.Addr(),
-		RFIDPort:           port(d.addr()),
+		RFIDPort:          port(d.addr()),
 		NumSIPConnections: 1,
 	})
-	go hub.Serve()
 	defer hub.Close()
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
@@ -583,15 +580,13 @@ func TestBarcodesSession(t *testing.T) {
 
 	// <- end setup
 
-	msg := <-d.incoming
-	if string(msg) != "VER2.00\r" {
+	if msg := <-d.incoming; string(msg) != "VER2.00\r" {
 		t.Fatal("RFID-unit didn't get version init command")
 	}
 	d.write([]byte("OK\r"))
 	<-uiChan // CONNECT OK
 
-	err := a.c.WriteMessage(websocket.TextMessage, []byte(`{"Action":"CHECKIN"}`))
-	if err != nil {
+	if err := a.c.WriteMessage(websocket.TextMessage, []byte(`{"Action":"CHECKIN"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")
 	}
 
@@ -608,13 +603,12 @@ func TestBarcodesSession(t *testing.T) {
 	<-d.incoming
 	d.write([]byte("OK\r"))
 
-	Message := <-uiChan
-
-	if Message.SIPError {
+	if got := <-uiChan; got.SIPError {
 		t.Fatalf("Rereading of failed tags triggered multiple SIP-calls")
 	}
 }
 
+/*
 func TestWriteLogic(t *testing.T) {
 	// setup ->
 
