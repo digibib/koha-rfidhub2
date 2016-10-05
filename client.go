@@ -39,7 +39,6 @@ type Client struct {
 	conn           *websocket.Conn
 	rfidconn       net.Conn
 	rfid           *RFIDManager
-	readBuf        []byte
 	fromKoha       chan Message
 	fromRFID       chan RFIDResp
 	quit           chan bool
@@ -395,6 +394,7 @@ func (c *Client) Run(cfg Config) {
 				// TODO default case -> ERROR
 			}
 		case <-c.quit:
+			//c.sendToRFID(RFIDReq{Cmd: cmdEndScan})
 			c.wlock.Lock()
 			c.write(websocket.CloseMessage, []byte{})
 			c.wlock.Unlock()
@@ -422,15 +422,15 @@ func (c *Client) initRFID(port string) {
 	log.Printf("-> [%s] %q", c.IP, string(req))
 
 	r := bufio.NewReader(c.rfidconn)
-	n, err := r.Read(c.readBuf)
+	b, err := r.ReadBytes('\r')
 	if err != nil {
 		initError = err.Error()
 	}
-	resp, err := c.rfid.ParseResponse(c.readBuf[:n])
+	resp, err := c.rfid.ParseResponse(b)
 	if err != nil {
 		initError = err.Error()
 	}
-	log.Printf("<- [%s] %q", c.IP, string(c.readBuf[:n]))
+	log.Printf("<- [%s] %q", c.IP, string(b))
 
 	if initError == "" && !resp.OK {
 		initError = "RFID-unit responded with NOK"
@@ -455,6 +455,7 @@ func (c *Client) readFromKoha() {
 	defer func() {
 		c.hub.Disconnect(c)
 		c.conn.Close()
+		c.rfidconn.Close()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))

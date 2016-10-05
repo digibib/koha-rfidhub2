@@ -110,7 +110,6 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		fromKoha:       make(chan Message),
 		fromRFID:       make(chan RFIDResp),
 		quit:           make(chan bool, 5),
-		readBuf:        make([]byte, 1024),
 		rfid:           newRFIDManager(),
 		items:          make(map[string]Message),
 		failedAlarmOn:  make(map[string]string),
