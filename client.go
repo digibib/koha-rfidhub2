@@ -64,7 +64,7 @@ func (c *Client) Run(cfg Config) {
 				var err error
 				c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(msg.Item.Barcode), itemStatusParse)
 				if err != nil {
-					log.Printf("ERR [%s] SIP call: %v", c.IP, err)
+					log.Printf("ER [%s] SIP call: %v", c.IP, err)
 					c.sendToKoha(Message{Action: "ITEM-INFO", SIPError: true, ErrorMessage: err.Error()})
 					c.quit <- true // really?
 					break
@@ -168,7 +168,7 @@ func (c *Client) Run(cfg Config) {
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
 						c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
 						if err != nil {
-							log.Printf("ERR [%s] SIP: %v", c.IP, err)
+							log.Printf("ER [%s] SIP: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CONNECT", SIPError: true, ErrorMessage: err.Error()})
 							c.quit <- true
 							break
@@ -183,7 +183,7 @@ func (c *Client) Run(cfg Config) {
 					// Proceed with checkin transaciton
 					c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse)
 					if err != nil {
-						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
+						log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKIN", SIPError: true, ErrorMessage: err.Error()})
 						// TODO send cmdAlarmLeave to RFID?
 						break
@@ -209,7 +209,7 @@ func (c *Client) Run(cfg Config) {
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
 						c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgItemStatus(resp.Barcode), itemStatusParse)
 						if err != nil {
-							log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
+							log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
 							// c.quit <- true // really?
 							break
@@ -223,7 +223,7 @@ func (c *Client) Run(cfg Config) {
 					// proced with checkout transaction
 					c.current, err = DoSIPCall(c.hub.config, initSIPConn(c.hub.config), sipFormMsgCheckout(c.branch, c.patron, resp.Barcode), checkoutParse)
 					if err != nil {
-						log.Printf("ERR [%s] SIP call failed: %v", c.IP, err)
+						log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
 						// c.quit <- true // really?
 						break
@@ -242,7 +242,7 @@ func (c *Client) Run(cfg Config) {
 				}
 			case RFIDCheckoutWaitForBegOK:
 				if !resp.OK {
-					log.Printf("ERR [%v] RFID failed to start scanning, shutting down.", c.IP)
+					log.Printf("ER [%v] RFID failed to start scanning, shutting down.", c.IP)
 					c.sendToKoha(Message{Action: "CHECKOUT", RFIDError: true})
 					c.quit <- true // really?
 					break
@@ -264,7 +264,7 @@ func (c *Client) Run(cfg Config) {
 				if !resp.OK {
 					// I can't imagine the RFID-reader fails to leave the
 					// alarm in it current state. In any case, we continue
-					log.Printf("ERR [%v] RFID reader failed to leave alarm in current state", c.IP)
+					log.Printf("ER [%v] RFID reader failed to leave alarm in current state", c.IP)
 				}
 				c.state = RFIDCheckout
 				c.sendToKoha(c.current)
@@ -408,7 +408,7 @@ func (c *Client) initRFID(port string) {
 	var err error
 	c.rfidconn, err = net.Dial("tcp", net.JoinHostPort(c.IP, port))
 	if err != nil {
-		log.Printf("ERR [%s] RFID server tcp connect: %v", c.IP, err)
+		log.Printf("ER [%s] RFID server tcp connect: %v", c.IP, err)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 		c.quit <- true
 		return
@@ -438,13 +438,13 @@ func (c *Client) initRFID(port string) {
 	}
 
 	if initError != "" {
-		log.Printf("ERR [%s] RFID initialization: %s", c.IP, initError)
+		log.Printf("ER [%s] RFID initialization: %s", c.IP, initError)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: initError})
 		c.quit <- true
 		return
 	}
 
-	log.Printf("[%s] RIFD connected & initialized", c.IP)
+	log.Printf("OK [%s] RIFD connected & initialized", c.IP)
 
 	go c.readFromRFID(r)
 
@@ -472,7 +472,7 @@ func (c *Client) readFromKoha() {
 		}
 		var msg Message
 		if err := json.Unmarshal(jsonMsg, &msg); err != nil {
-			log.Printf("ERR [%s] unmarshal message: %v", c.IP, err)
+			log.Printf("ER [%s] unmarshal message: %v", c.IP, err)
 			c.sendToKoha(Message{Action: "CONNECT", UserError: true, ErrorMessage: err.Error()})
 			continue
 		}
@@ -519,7 +519,7 @@ func (c *Client) readFromRFID(r *bufio.Reader) {
 
 		resp, err := c.rfid.ParseResponse(b)
 		if err != nil {
-			log.Printf("ERR [%v] %v", c.IP, err)
+			log.Printf("ER [%v] %v", c.IP, err)
 			c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 			c.quit <- true // TODO really?
 			break
@@ -538,7 +538,7 @@ func (c *Client) sendToRFID(req RFIDReq) {
 	}
 	_, err := c.rfidconn.Write(b)
 	if err != nil {
-		log.Printf("ERR [%v] %v", c.IP, err)
+		log.Printf("ER [%v] %v", c.IP, err)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 		c.quit <- true
 		return
