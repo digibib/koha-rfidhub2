@@ -510,7 +510,7 @@ func (c *Client) readFromRFID(r *bufio.Reader) {
 	for {
 		b, err := r.ReadBytes('\r')
 		if err != nil && len(b) == 0 {
-			log.Printf("[%v] RFID server tcp read failed: %v", c.IP, err)
+			log.Printf("ER [%v] RFID server tcp read failed: %v", c.IP, err)
 			c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
 			c.quit <- true
 			break
@@ -533,7 +533,7 @@ func (c *Client) sendToRFID(req RFIDReq) {
 	c.rfidLock.Lock()
 	defer c.rfidLock.Unlock()
 	if c.rfidconn == nil {
-		log.Println("? RFID conn gone TODO investigate")
+		log.Println("?? RFID conn gone TODO investigate")
 		return
 	}
 	_, err := c.rfidconn.Write(b)

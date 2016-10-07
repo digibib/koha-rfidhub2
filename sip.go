@@ -228,7 +228,7 @@ func initSIPConn(cfg Config) func() (net.Conn, error) {
 		msg := sipFormMsgLogin(cfg.SIPUser, cfg.SIPPass, cfg.SIPDept)
 
 		if err = msg.Encode(conn); err != nil {
-			log.Printf("ERR SIP connect: %v", err)
+			log.Printf("ER SIP connect: %v", err)
 			return nil, err
 		}
 		if cfg.LogSIPMessages {
@@ -238,7 +238,7 @@ func initSIPConn(cfg Config) func() (net.Conn, error) {
 		reader := bufio.NewReader(conn)
 		in, err := reader.ReadString('\r')
 		if err != nil {
-			log.Printf("ERR SIP read: %v", err)
+			log.Printf("ER SIP read: %v", err)
 			return nil, err
 		}
 
