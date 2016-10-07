@@ -37,6 +37,7 @@ type Client struct {
 	hub            *Hub
 	wlock          sync.Mutex
 	conn           *websocket.Conn
+	rfidLock       sync.Mutex
 	rfidconn       net.Conn
 	rfid           *RFIDManager
 	fromKoha       chan Message
@@ -455,9 +456,11 @@ func (c *Client) readFromKoha() {
 	defer func() {
 		c.hub.Disconnect(c)
 		c.conn.Close()
+		c.rfidLock.Lock()
 		if c.rfidconn != nil {
 			c.rfidconn.Close()
 		}
+		c.rfidLock.Unlock()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(c.hub.config.RFIDTimeout))
@@ -527,6 +530,12 @@ func (c *Client) readFromRFID(r *bufio.Reader) {
 
 func (c *Client) sendToRFID(req RFIDReq) {
 	b := c.rfid.GenRequest(req)
+	c.rfidLock.Lock()
+	defer c.rfidLock.Unlock()
+	if c.rfidconn == nil {
+		log.Println("? RFID conn gone TODO investigate")
+		return
+	}
 	_, err := c.rfidconn.Write(b)
 	if err != nil {
 		log.Printf("ERR [%v] %v", c.IP, err)
