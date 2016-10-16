@@ -74,7 +74,7 @@ func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc) (M
 	}
 
 	// 1. Send the SIP request
-	if err = msg.Encode(conn); err != nil {
+	if _, err = msg.Encode(conn); err != nil {
 		return Message{}, err
 	}
 
@@ -227,7 +227,7 @@ func initSIPConn(cfg Config) func() (net.Conn, error) {
 
 		msg := sipFormMsgLogin(cfg.SIPUser, cfg.SIPPass, cfg.SIPDept)
 
-		if err = msg.Encode(conn); err != nil {
+		if _, err = msg.Encode(conn); err != nil {
 			log.Printf("ER SIP connect: %v", err)
 			return nil, err
 		}
