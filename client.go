@@ -524,7 +524,11 @@ func (c *Client) readFromRFID(r *bufio.Reader) {
 			c.quit <- true // TODO really?
 			break
 		}
-		c.fromRFID <- resp
+		select {
+		case c.fromRFID <- resp:
+		case <-time.After(time.Second * 3):
+			return
+		}
 	}
 }
 
