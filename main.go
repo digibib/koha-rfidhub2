@@ -92,7 +92,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		log.Println("ERR cannot get remote IP address: %v", err)
+		log.Printf("ERR cannot get remote IP address: %v", err)
 		return
 	}
 	client := &Client{

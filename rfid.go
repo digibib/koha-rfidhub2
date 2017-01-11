@@ -33,7 +33,6 @@ const (
 	RFIDWaitForTagCount
 	RFIDWaitForRetryAlarmOn
 	RFIDWaitForRetryAlarmOff
-	RFIDOff
 	RFIDWaitForEndOK
 )
 

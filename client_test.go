@@ -63,9 +63,6 @@ func (d *dummyRFID) run() {
 
 func (d *dummyRFID) addr() string {
 	d.mu.RLock()
-	if d.ln == nil {
-		time.Sleep(100)
-	}
 	defer d.mu.RUnlock()
 	addr := "http://" + d.ln.Addr().String()
 	return addr
@@ -787,7 +784,6 @@ func TestUserErrors(t *testing.T) {
 
 	a := newDummyUIAgent(uiChan, port(srv.URL))
 	defer a.c.Close()
-	time.Sleep(50)
 	// <- end setup
 
 	if msg := <-d.incoming; string(msg) != "VER2.00\r" {

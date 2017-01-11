@@ -106,6 +106,9 @@ func TestSIPCheckin(t *testing.T) {
 
 	srv.Respond("100NUY20140128    114702AO|AB234567890|CV99|AFItem not checked out|\r")
 	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckin("HUTL", "234567890"), checkinParse)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !res.Item.TransactionFailed {
 		t.Errorf("res.Item.TransactionFailed == false; want true")
 	}
