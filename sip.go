@@ -66,7 +66,7 @@ type initFunc func() (net.Conn, error)
 
 // DoSIPCall performs a SIP request. It takes a SIP message as a string and a
 // parser function to transform the SIP response into a Message.
-func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc) (Message, error) {
+func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc, clientIP string) (Message, error) {
 	// 0. Get connection from pool
 	conn, err := init()
 	if err != nil {
@@ -79,7 +79,7 @@ func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc) (M
 	}
 
 	if cfg.LogSIPMessages {
-		log.Printf("-> %v", strings.TrimSpace(msg.String()))
+		log.Printf("-> [%s] %v", clientIP, strings.TrimSpace(msg.String()))
 	}
 
 	// 2. Read SIP response
@@ -92,7 +92,7 @@ func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc) (M
 	conn.Close()
 
 	if cfg.LogSIPMessages {
-		log.Printf("<- %v", strings.TrimSpace(string(resp)))
+		log.Printf("<- [%s] %v", clientIP, strings.TrimSpace(string(resp)))
 	}
 
 	// 3. Parse the response
