@@ -18,9 +18,10 @@ type Config struct {
 	SIPServer string // Adress of the SIP-server
 
 	// Credentials for SIP user to use in rfid-hub
-	SIPUser string
-	SIPPass string
-	SIPDept string
+	SIPUser    string
+	SIPPass    string
+	SIPDept    string
+	SIPMaxConn int
 
 	RFIDTimeout time.Duration
 
@@ -35,6 +36,7 @@ var (
 		SIPServer:      "sip_proxy:9999",
 		SIPUser:        "autouser",
 		SIPPass:        "autopass",
+		SIPMaxConn:     5,
 		LogSIPMessages: true,
 		RFIDTimeout:    15 * time.Minute,
 	}
@@ -68,6 +70,8 @@ func init() {
 
 func main() {
 	flag.DurationVar(&config.RFIDTimeout, "rfid-timeout", 15*time.Minute, "RFID-timeout in Koha UI")
+	flag.IntVar(&config.SIPMaxConn, "sip-maxconn", 5, "Max size of SIP connection pool")
+
 	flag.Parse()
 	hub = newHub(config)
 	defer hub.Close()

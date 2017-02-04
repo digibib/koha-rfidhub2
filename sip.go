@@ -66,15 +66,27 @@ type initFunc func() (net.Conn, error)
 
 // DoSIPCall performs a SIP request. It takes a SIP message as a string and a
 // parser function to transform the SIP response into a Message.
-func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc, clientIP string) (Message, error) {
+func DoSIPCall(cfg Config, p *pool, msg sip.Message, parser parserFunc, clientIP string) (Message, error) {
+	resp, err := doSIPCall(cfg, p, msg, parser, clientIP)
+	if err == nil {
+		return resp, err
+	}
+	// Try a second time, in case the pooled connection was disconnected
+	// by the SIP server.
+	return doSIPCall(cfg, p, msg, parser, clientIP)
+}
+
+func doSIPCall(cfg Config, p *pool, msg sip.Message, parser parserFunc, clientIP string) (Message, error) {
 	// 0. Get connection from pool
-	conn, err := init()
+	conn, err := p.get()
 	if err != nil {
 		return Message{}, err
 	}
+	defer p.put(conn)
 
 	// 1. Send the SIP request
 	if _, err = msg.Encode(conn); err != nil {
+		p.isFailing(conn)
 		return Message{}, err
 	}
 
@@ -87,9 +99,9 @@ func DoSIPCall(cfg Config, init initFunc, msg sip.Message, parser parserFunc, cl
 	reader := bufio.NewReader(conn)
 	resp, err := reader.ReadBytes('\r')
 	if err != nil {
+		p.isFailing(conn)
 		return Message{}, err
 	}
-	conn.Close()
 
 	if cfg.LogSIPMessages {
 		log.Printf("<- [%s] %v", clientIP, strings.TrimSpace(string(resp)))
@@ -231,19 +243,12 @@ func initSIPConn(cfg Config) func() (net.Conn, error) {
 			log.Printf("ER SIP connect: %v", err)
 			return nil, err
 		}
-		if cfg.LogSIPMessages {
-			log.Printf("-> %v", strings.TrimSpace(msg.String()))
-		}
 
 		reader := bufio.NewReader(conn)
 		in, err := reader.ReadString('\r')
 		if err != nil {
 			log.Printf("ER SIP read: %v", err)
 			return nil, err
-		}
-
-		if cfg.LogSIPMessages {
-			log.Printf("<- %v", strings.TrimSpace(in))
 		}
 
 		// fail if response == 940 (success == 941)

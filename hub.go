@@ -8,6 +8,7 @@ type Hub struct {
 	clients     map[*Client]bool   // Connected clients
 	clientsByIP map[string]*Client // Connected clients keyed by IP-address
 	config      Config
+	sipPool     *pool
 }
 
 func newHub(cfg Config) *Hub {
@@ -15,6 +16,7 @@ func newHub(cfg Config) *Hub {
 		clients:     make(map[*Client]bool),
 		clientsByIP: make(map[string]*Client),
 		config:      cfg,
+		sipPool:     newPool(cfg.SIPMaxConn, initSIPConn(cfg)),
 	}
 }
 

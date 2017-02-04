@@ -39,9 +39,7 @@ func (s *SIPTestServer) handle(conn net.Conn) {
 		if err != nil {
 			break
 		}
-		if auth {
-			return
-		}
+
 		auth = true
 	}
 }
@@ -56,7 +54,7 @@ func (s *SIPTestServer) run() {
 		if s.failing {
 			conn.Close()
 			s.RUnlock()
-			return
+			continue
 		}
 		s.RUnlock()
 		go s.handle(conn)
@@ -86,10 +84,11 @@ func TestSIPCheckin(t *testing.T) {
 	defer srv.Close()
 
 	initFn := initSIPConn(Config{SIPServer: srv.Addr(), RFIDTimeout: 1 * time.Second})
+	p := newPool(1, initFn)
 
 	srv.Respond("101YNN20140124    093621AOHUTL|AB03011143299001|AQhvmu|AJ316 salmer og sanger|AA1|CS783.4|\r")
 
-	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckin("HUTL", "03011143299001"), checkinParse, "testIP")
+	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgCheckin("HUTL", "03011143299001"), checkinParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +104,7 @@ func TestSIPCheckin(t *testing.T) {
 	}
 
 	srv.Respond("100NUY20140128    114702AO|AB234567890|CV99|AFItem not checked out|\r")
-	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckin("HUTL", "234567890"), checkinParse, "testIP")
+	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgCheckin("HUTL", "234567890"), checkinParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestSIPCheckin(t *testing.T) {
 	}
 
 	srv.Respond("100YNY20140511    092216AOGRY|AB03010013753001|AQhutl|AJHeksenes historie|CS272 And|CTfroa|CY11|DAåsen|CV02|AFItem not checked out|\r")
-	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckin("hutl", "03010013753001"), checkinParse, "testIP")
+	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgCheckin("hutl", "03010013753001"), checkinParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,9 +130,10 @@ func TestSIPCheckout(t *testing.T) {
 	defer srv.Close()
 
 	initFn := initSIPConn(Config{SIPServer: srv.Addr(), RFIDTimeout: 1 * time.Second})
+	p := newPool(1, initFn)
 
 	srv.Respond("121NNY20140124    110740AOHUTL|AA2|AB03011174511003|AJKrutt-Kim|AH20140221    235900|\r")
-	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckout("HUTL", "2", "03011174511003"), checkoutParse, "testIP")
+	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgCheckout("HUTL", "2", "03011174511003"), checkoutParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestSIPCheckout(t *testing.T) {
 	}
 
 	srv.Respond("120NUN20140124    131049AOHUTL|AA2|AB1234|AJ|AH|AFInvalid Item|BLY|\r")
-	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgCheckout("HUTL", "2", "1234"), checkoutParse, "testIP")
+	res, err = DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgCheckout("HUTL", "2", "1234"), checkoutParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,9 +165,11 @@ func TestSIPItemStatus(t *testing.T) {
 	defer srv.Close()
 
 	initFn := initSIPConn(Config{SIPServer: srv.Addr(), RFIDTimeout: 1 * time.Second})
+	p := newPool(1, initFn)
+
 	srv.Respond("1801010120140228    110748AB1003010856677001|AO|AJ|\r")
 
-	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, initFn, sipFormMsgItemStatus("1003010856677001"), itemStatusParse, "testIP")
+	res, err := DoSIPCall(Config{RFIDTimeout: 1 * time.Second}, p, sipFormMsgItemStatus("1003010856677001"), itemStatusParse, "testIP")
 	if err != nil {
 		t.Fatal(err)
 	}
