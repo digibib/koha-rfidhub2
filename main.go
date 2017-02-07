@@ -73,6 +73,8 @@ func main() {
 	flag.IntVar(&config.SIPMaxConn, "sip-maxconn", 5, "Max size of SIP connection pool")
 
 	flag.Parse()
+
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
 	hub = newHub(config)
 	defer hub.Close()
 
