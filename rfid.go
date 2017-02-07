@@ -146,6 +146,7 @@ func (v *RFIDManager) GenRequest(r RFIDReq) []byte {
 
 // ParseResponse parses a RFID response.
 func (v *RFIDManager) ParseResponse(r []byte) (RFIDResp, error) {
+	// TODO this parser function could use some love
 	s := strings.TrimSuffix(string(r), "\r")
 	s = strings.TrimPrefix(s, "\n")
 	l := len(s)
