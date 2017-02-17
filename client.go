@@ -44,7 +44,6 @@ type Client struct {
 
 // Run the state-machine of the client
 func (c *Client) Run(cfg Config) {
-	go c.initRFID(cfg.RFIDPort)
 	for {
 		select {
 		case msg := <-c.fromKoha:
@@ -401,7 +400,7 @@ func (c *Client) Run(cfg Config) {
 	}
 }
 
-func (c *Client) initRFID(port string) {
+func (c *Client) initRFID(port string) (*bufio.Reader, bool) {
 	var err error
 	c.rfidLock.Lock()
 	defer c.rfidLock.Unlock()
@@ -409,8 +408,7 @@ func (c *Client) initRFID(port string) {
 	if err != nil {
 		log.Printf("ER [%s] RFID server tcp connect: %v", c.IP, err)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: err.Error()})
-		c.quit <- true
-		return
+		return nil, false
 	}
 	// Init the RFID-unit with version command
 	var initError string
@@ -439,16 +437,14 @@ func (c *Client) initRFID(port string) {
 	if initError != "" {
 		log.Printf("ER [%s] RFID initialization: %s", c.IP, initError)
 		c.sendToKoha(Message{Action: "CONNECT", RFIDError: true, ErrorMessage: initError})
-		c.quit <- true
-		return
+		return nil, false
 	}
 
 	log.Printf("OK [%s] RIFD connected & initialized", c.IP)
 
-	go c.readFromRFID(r)
-
 	// Notify UI of success:
 	c.sendToKoha(Message{Action: "CONNECT"})
+	return r, true
 }
 
 func (c *Client) readFromKoha() {

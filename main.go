@@ -114,6 +114,12 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		failedAlarmOff: make(map[string]string),
 	}
 	hub.Connect(client)
+	rfid, ok := client.initRFID(hub.config.RFIDPort)
+	if !ok {
+		hub.Disconnect(client)
+		return
+	}
+	go client.readFromRFID(rfid)
 	go client.Run(hub.config)
 	client.readFromKoha()
 }
