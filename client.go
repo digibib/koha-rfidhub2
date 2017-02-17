@@ -403,6 +403,8 @@ func (c *Client) Run(cfg Config) {
 
 func (c *Client) initRFID(port string) {
 	var err error
+	c.rfidLock.Lock()
+	defer c.rfidLock.Unlock()
 	c.rfidconn, err = net.Dial("tcp", net.JoinHostPort(c.IP, port))
 	if err != nil {
 		log.Printf("ER [%s] RFID server tcp connect: %v", c.IP, err)
