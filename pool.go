@@ -36,13 +36,13 @@ func (p *pool) get() (net.Conn, error) {
 
 func (p *pool) put(conn net.Conn) {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if p.failing[conn] {
 		delete(p.failing, conn)
 		conn.Close()
 		return
 	}
-	p.mu.Unlock()
 
 	select {
 	case p.conns <- conn:
