@@ -62,8 +62,6 @@ func sipFormMsgItemStatus(barcode string) sip.Message {
 // returns the JSON message to be sent to the user interface.
 type parserFunc func(sip.Message) Message
 
-type initFunc func() (net.Conn, error)
-
 // DoSIPCall performs a SIP request. It takes a SIP message as a string and a
 // parser function to transform the SIP response into a Message.
 func DoSIPCall(cfg Config, p *pool, msg sip.Message, parser parserFunc, clientIP string) (Message, error) {
