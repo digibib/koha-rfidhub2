@@ -52,7 +52,7 @@ const (
 	cmdWrite
 
 	// Initialize writer commands.
-	// SLP (Set Library Paramter) commands. Reader returns OK or NOK.
+	// SLP (Set Library Parameter) commands. Reader returns OK or NOK.
 	cmdSLPLBN // SLPLBN|02030000 (LBN: library number)
 	cmdSLPLBC // SLPLBC|NO       (LBC: library country code)
 	cmdSLPDTM // SLPDTM|DS24     (DTM: data model, "Danish Standard" / ISO28560−3)
@@ -64,7 +64,7 @@ const (
 
 	// The following are not used:
 	//cmdSLPEID // SLPEID|1        (EID: send extended ID, 0: No, 1: Yes − include library number and country code)
-	//cmdSLPESP // SLPESP|:        (ESP: extended ID seperator: default character ’:’)
+	//cmdSLPESP // SLPESP|:        (ESP: extended ID separator: default character ’:’)
 )
 
 type RFIDManager struct {

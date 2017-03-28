@@ -471,7 +471,7 @@ func TestCheckouts(t *testing.T) {
 	// acknowledge BEG command
 	d.write([]byte("OK\r"))
 
-	// Simulate book on RFID-unit, but SIP show that book is allready checked out.
+	// Simulate book on RFID-unit, but SIP show that book is already checked out.
 	// Verify that UI gets notified with the books title, along with an error message
 	sipSrv.Respond("120NUN20140303    102741AOHUTL|AA95|AB03011174511003|AJKrutt-Kim|AH|AFItem checked out to another patron|BLY|\r")
 	d.write([]byte("RDT1003011174511003:NO:02030000|0\r"))
@@ -492,10 +492,10 @@ func TestCheckouts(t *testing.T) {
 		}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Got %+v; want %+v", got, want)
-		t.Fatal("UI didn't get the correct message when item is allready checked out to another patron")
+		t.Fatal("UI didn't get the correct message when item is already checked out to another patron")
 	}
 
-	// Test successfull checkout
+	// Test successful checkout
 	sipSrv.Respond("121NNY20140303    110236AOHUTL|AA95|AB03011063175001|AJCat's cradle|AH20140331    235900|\r")
 	d.write([]byte("RDT1003011063175001:NO:02030000|0\r"))
 
@@ -804,7 +804,7 @@ func TestUserErrors(t *testing.T) {
 		t.Errorf("Got %+v; want %+v", got, want)
 	}
 
-	// Attemp CHECKOUT without sending the patron barcode
+	// Attempt CHECKOUT without sending the patron barcode
 	if err := a.c.WriteMessage(websocket.TextMessage,
 		[]byte(`{"Action":"CHECKOUT"}`)); err != nil {
 		t.Fatal("UI failed to send message over websokcet conn")

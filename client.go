@@ -160,7 +160,7 @@ func (c *Client) Run(cfg Config) {
 					// Not OK on checkin means missing tags
 
 					// Get item info from SIP, in order to have a title to display
-					// Don't bother calling SIP if this is allready the current item
+					// Don't bother calling SIP if this is already the current item
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
 						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse, c.IP)
 						if err != nil {
@@ -176,7 +176,7 @@ func (c *Client) Run(cfg Config) {
 					c.state = RFIDWaitForCheckinAlarmLeave
 					break
 				} else {
-					// Proceed with checkin transaciton
+					// Proceed with checkin transaction
 					c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse, c.IP)
 					if err != nil {
 						log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
@@ -201,7 +201,7 @@ func (c *Client) Run(cfg Config) {
 					// TODO test this case
 
 					// Get status of item, to have title to display on screen,
-					// Don't bother calling SIP if this is allready the current item
+					// Don't bother calling SIP if this is already the current item
 					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
 						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse, c.IP)
 						if err != nil {

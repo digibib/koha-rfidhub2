@@ -15,7 +15,7 @@ import (
 type Config struct {
 	RFIDPort  string // Port which RFID-unit is listening on
 	HTTPPort  string // Listening Port of the HTTP and WebSocket server
-	SIPServer string // Adress of the SIP-server
+	SIPServer string // Address of the SIP-server
 
 	// Credentials for SIP user to use in rfid-hub
 	SIPUser    string

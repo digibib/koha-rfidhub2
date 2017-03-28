@@ -32,7 +32,7 @@ func (h *Hub) Connect(c *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if old, ok := h.clientsByIP[c.IP]; ok {
-		// There is allready a connection from the same IP, disconnect it.
+		// There is already a connection from the same IP, disconnect it.
 		delete(h.clients, old)
 		old.quit <- true
 	}
