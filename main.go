@@ -25,6 +25,8 @@ type Config struct {
 
 	RFIDTimeout time.Duration
 
+	WSProxy bool
+
 	LogSIPMessages bool
 }
 
@@ -39,6 +41,7 @@ var (
 		SIPMaxConn:     5,
 		LogSIPMessages: true,
 		RFIDTimeout:    15 * time.Minute,
+		WSProxy:        true,
 	}
 
 	hub *Hub
@@ -71,6 +74,7 @@ func init() {
 func main() {
 	flag.DurationVar(&config.RFIDTimeout, "rfid-timeout", 15*time.Minute, "RFID-timeout in Koha UI")
 	flag.IntVar(&config.SIPMaxConn, "sip-maxconn", 5, "Max size of SIP connection pool")
+	flag.BoolVar(&config.WSProxy, "ws-proxy", true, "WS goes through proxy, find client IP in request header")
 
 	flag.Parse()
 
@@ -96,10 +100,15 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		log.Printf("ERR cannot get remote IP address: %v", err)
-		return
+	var ip string
+	if hub.config.WSProxy {
+		ip = r.Header.Get("X-Forwarded-For")
+	} else {
+		ip, _, err = net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			log.Printf("ERR cannot get remote IP address: %v", err)
+			return
+		}
 	}
 	client := &Client{
 		IP:             ip,
