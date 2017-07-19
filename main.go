@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -28,6 +30,14 @@ type Config struct {
 	WSProxy bool
 
 	LogSIPMessages bool
+	LogRFID        bool
+}
+
+type rfidMsg struct {
+	barcode    string
+	branch     string
+	clientIP   string
+	sipMsgType string
 }
 
 // global variables
@@ -45,6 +55,8 @@ var (
 	}
 
 	hub *Hub
+
+	logToRFID chan rfidMsg
 )
 
 func init() {
@@ -75,8 +87,25 @@ func main() {
 	flag.DurationVar(&config.RFIDTimeout, "rfid-timeout", 15*time.Minute, "RFID-timeout in Koha UI")
 	flag.IntVar(&config.SIPMaxConn, "sip-maxconn", 5, "Max size of SIP connection pool")
 	flag.BoolVar(&config.WSProxy, "ws-proxy", true, "WS goes through proxy, find client IP in request header")
+	rfidEndpoint := flag.String("rfid-endpoint", "http://rfidscanner.deichman.no/hub/in", "RDID scanner endpoint")
 
 	flag.Parse()
+
+	if *rfidEndpoint != "" {
+		config.LogRFID = true
+		logToRFID = make(chan rfidMsg, 100)
+		const msg = `{"sender":%q,"branch:"%q,"client_IP":%q,"barcode":%q,"sip_message_type":%q}`
+		go func() {
+			for m := range logToRFID {
+				var b bytes.Buffer
+				fmt.Fprintf(&b, msg, "rfidhub", m.branch, m.clientIP, m.barcode, m.sipMsgType)
+				resp, err := http.Post(*rfidEndpoint, "application/json", &b)
+				if err == nil {
+					resp.Body.Close()
+				}
+			}
+		}()
+	}
 
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 	hub = newHub(config)
