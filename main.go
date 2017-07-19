@@ -94,7 +94,7 @@ func main() {
 	if *rfidEndpoint != "" {
 		config.LogRFID = true
 		logToRFID = make(chan rfidMsg, 100)
-		const msg = `{"sender":%q,"branch:"%q,"client_IP":%q,"barcode":%q,"sip_message_type":%q}`
+		const msg = `{"sender":%q,"branch":%q,"client_IP":%q,"barcode":%q,"sip_message_type":%q}`
 		go func() {
 			for m := range logToRFID {
 				var b bytes.Buffer
