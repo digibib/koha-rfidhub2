@@ -371,6 +371,8 @@ func (c *Client) Run(cfg Config) {
 					c.sendToKoha(c.current)
 					c.state = RFIDIdle
 					break
+				} else {
+					c.current.Item.TagCountFailed = false
 				}
 				c.state = RFIDWriting
 				c.sendToRFID(
