@@ -194,7 +194,7 @@ func checkoutParse(msg sip.Message) Message {
 
 	if msg.Field(sip.FieldOK) == "1" {
 		// We only want to display date if checkout was successful
-		date = formatDate(msg.Field(sip.FieldTransactionDate))
+		date = formatDate(msg.Field(sip.FieldDueDate))
 	} else {
 		fail = true
 	}
