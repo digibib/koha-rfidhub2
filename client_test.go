@@ -157,7 +157,7 @@ func TestMissingRFIDUnit(t *testing.T) {
 
 	msg := <-uiChan
 	want := Message{Action: "CONNECT", RFIDError: true,
-		ErrorMessage: fmt.Sprintf("dial tcp 127.0.0.1:%s: getsockopt: connection refused", hub.config.RFIDPort)}
+		ErrorMessage: fmt.Sprintf("dial tcp 127.0.0.1:%s: connect: connection refused", hub.config.RFIDPort)}
 	if !reflect.DeepEqual(msg, want) {
 		t.Errorf("Got %+v; want %+v", msg, want)
 		t.Fatal("UI didn't get notified of failed RFID connect")
@@ -511,7 +511,7 @@ func TestCheckouts(t *testing.T) {
 		Item: Item{
 			Label:          "Cat's cradle",
 			Barcode:        "03011063175001",
-			Date:           "03/03/2014",
+			Date:           "31/03/2014",
 			AlarmOffFailed: true,
 			Status:         "Feil: fikk ikke skrudd av alarm.",
 		}}
@@ -538,7 +538,7 @@ func TestCheckouts(t *testing.T) {
 		Item: Item{
 			Label:   "Cat's cradle",
 			Barcode: "03011063175001",
-			Date:    "03/03/2014",
+			Date:    "31/03/2014",
 		}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Got %+v; want %+v", got, want)

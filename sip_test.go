@@ -143,7 +143,7 @@ func TestSIPCheckout(t *testing.T) {
 	if want := "Krutt-Kim"; res.Item.Label != want {
 		t.Errorf("res.Item.Label == %q; want %q", res.Item.Label, want)
 	}
-	if want := "24/01/2014"; res.Item.Date != want {
+	if want := "21/02/2014"; res.Item.Date != want {
 		t.Errorf("res.Item.Date == %q; want %q", res.Item.Date, want)
 	}
 
