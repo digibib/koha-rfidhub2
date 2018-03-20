@@ -92,17 +92,6 @@ func doSIPCall(cfg Config, p *pool, msg sip.Message, parser parserFunc, clientIP
 		log.Printf("-> [%s] %v", clientIP, strings.TrimSpace(msg.String()))
 	}
 
-	if cfg.LogRFID {
-		if barcode := msg.Field(sip.FieldItemIdentifier); barcode != "" {
-			logToRFID <- rfidMsg{
-				branch:     msg.Field(sip.FieldInstitutionID),
-				clientIP:   clientIP,
-				barcode:    barcode,
-				sipMsgType: msg.Type().String(),
-			}
-		}
-	}
-
 	// 2. Read SIP response
 
 	reader := bufio.NewReader(conn)
@@ -123,6 +112,17 @@ func doSIPCall(cfg Config, p *pool, msg sip.Message, parser parserFunc, clientIP
 	}
 
 	res := parser(respMsg)
+
+	if cfg.LogRFID {
+		if barcode := respMsg.Field(sip.FieldItemIdentifier); barcode != "" && respMsg.Field(sip.FieldOK) == "1" {
+			logToRFID <- rfidMsg{
+				branch:     respMsg.Field(sip.FieldInstitutionID),
+				clientIP:   clientIP,
+				barcode:    barcode,
+				sipMsgType: respMsg.Type().String(),
+			}
+		}
+	}
 
 	return res, nil
 }
