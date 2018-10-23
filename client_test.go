@@ -819,6 +819,23 @@ func TestUserErrors(t *testing.T) {
 
 }
 
+func TestBarcodeFromTag(t *testing.T) {
+	var tests = []struct {
+		in  string
+		out string
+	}{
+		{"1003011596802008:NO:02030000", "03011596802008"}, // only deichman tags should strip 10
+		{"1003011596802008:NO:02030001", "1003011596802008"},
+		{"10123456789012", "10123456789012"},
+	}
+	for _, tt := range tests {
+		r := barcodeFromTag(tt.in)
+		if !reflect.DeepEqual(r, tt.out) {
+			t.Errorf("BarcodeFromTag(%s) got: %s\t want %s\n", tt.in, r, tt.out)
+		}
+	}
+}
+
 /*
 // Verify that if a second websocket connection is opened from the same IP,
 // the first connection is closed.

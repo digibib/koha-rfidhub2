@@ -161,8 +161,8 @@ func (c *Client) Run(cfg Config) {
 
 					// Get item info from SIP, in order to have a title to display
 					// Don't bother calling SIP if this is already the current item
-					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
-						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse, c.IP)
+					if barcodeFromTag(resp.Tag) != c.current.Item.Barcode {
+						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Tag), itemStatusParse, c.IP)
 						if err != nil {
 							log.Printf("ER [%s] SIP: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CONNECT", SIPError: true, ErrorMessage: err.Error()})
@@ -171,13 +171,13 @@ func (c *Client) Run(cfg Config) {
 						}
 					}
 					c.current.Action = "CHECKIN"
-					c.items[stripLeading10(resp.Barcode)] = c.current
+					c.items[barcodeFromTag(resp.Tag)] = c.current
 					c.sendToRFID(RFIDReq{Cmd: cmdAlarmLeave})
 					c.state = RFIDWaitForCheckinAlarmLeave
 					break
 				} else {
 					// Proceed with checkin transaction
-					c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgCheckin(c.branch, resp.Barcode), checkinParse, c.IP)
+					c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgCheckin(c.branch, resp.Tag), checkinParse, c.IP)
 					if err != nil {
 						log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKIN", SIPError: true, ErrorMessage: err.Error()})
@@ -188,8 +188,8 @@ func (c *Client) Run(cfg Config) {
 						c.sendToRFID(RFIDReq{Cmd: cmdAlarmLeave})
 						c.state = RFIDWaitForCheckinAlarmLeave
 					} else {
-						c.items[stripLeading10(resp.Barcode)] = c.current
-						c.failedAlarmOn[stripLeading10(resp.Barcode)] = resp.Tag // Store tag id for potential retry
+						c.items[barcodeFromTag(resp.Tag)] = c.current
+						c.failedAlarmOn[barcodeFromTag(resp.Tag)] = resp.Tag // Store tag id for potential retry
 						c.sendToRFID(RFIDReq{Cmd: cmdAlarmOn})
 						c.state = RFIDWaitForCheckinAlarmOn
 					}
@@ -202,8 +202,8 @@ func (c *Client) Run(cfg Config) {
 
 					// Get status of item, to have title to display on screen,
 					// Don't bother calling SIP if this is already the current item
-					if stripLeading10(resp.Barcode) != c.current.Item.Barcode {
-						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Barcode), itemStatusParse, c.IP)
+					if barcodeFromTag(resp.Tag) != c.current.Item.Barcode {
+						c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgItemStatus(resp.Tag), itemStatusParse, c.IP)
 						if err != nil {
 							log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 							c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
@@ -212,12 +212,12 @@ func (c *Client) Run(cfg Config) {
 						}
 					}
 					c.current.Action = "CHECKOUT"
-					c.items[stripLeading10(resp.Barcode)] = c.current
+					c.items[barcodeFromTag(resp.Tag)] = c.current
 					c.sendToRFID(RFIDReq{Cmd: cmdAlarmLeave})
 					c.state = RFIDWaitForCheckoutAlarmLeave
 				} else {
 					// proced with checkout transaction
-					c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgCheckout(c.branch, c.patron, resp.Barcode), checkoutParse, c.IP)
+					c.current, err = DoSIPCall(c.hub.config, c.hub.sipPool, sipFormMsgCheckout(c.branch, c.patron, resp.Tag), checkoutParse, c.IP)
 					if err != nil {
 						log.Printf("ER [%s] SIP call failed: %v", c.IP, err)
 						c.sendToKoha(Message{Action: "CHECKOUT", SIPError: true, ErrorMessage: err.Error()})
@@ -230,8 +230,8 @@ func (c *Client) Run(cfg Config) {
 						c.state = RFIDWaitForCheckoutAlarmLeave
 						break
 					} else {
-						c.items[stripLeading10(resp.Barcode)] = c.current
-						c.failedAlarmOff[stripLeading10(resp.Barcode)] = resp.Tag // Store tag id for potential retry
+						c.items[barcodeFromTag(resp.Tag)] = c.current
+						c.failedAlarmOff[barcodeFromTag(resp.Tag)] = resp.Tag // Store tag id for potential retry
 						c.sendToRFID(RFIDReq{Cmd: cmdAlarmOff})
 						c.state = RFIDWaitForCheckoutAlarmOff
 					}
@@ -547,6 +547,13 @@ func (c *Client) sendToRFID(req RFIDReq) {
 	log.Printf("-> [%v] %q", c.IP, string(b))
 }
 
-func stripLeading10(barcode string) string {
-	return strings.TrimPrefix(barcode, "10")
+func barcodeFromTag(tag string) string {
+	var barcode string
+	id := strings.Split(tag, ":")
+	if len(id) == 3 && id[2] == "02030000" {
+		barcode = strings.TrimPrefix(id[0], "10")
+	} else {
+		barcode = id[0]
+	}
+	return barcode
 }
