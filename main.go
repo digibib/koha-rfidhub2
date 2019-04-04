@@ -96,10 +96,14 @@ func main() {
 		logToRFID = make(chan rfidMsg, 100)
 		const msg = `{"sender":%q,"branch":%q,"client_IP":%q,"barcode":%q,"sip_message_type":%q}`
 		go func() {
+			client := http.Client{
+				Timeout: time.Duration(100 * time.MilliSecond),
+			}
 			for m := range logToRFID {
 				var b bytes.Buffer
 				fmt.Fprintf(&b, msg, "rfidhub", m.branch, m.clientIP, m.barcode, m.sipMsgType)
-				resp, err := http.Post(*rfidEndpoint, "application/json", &b)
+
+				resp, err := client.Post(*rfidEndpoint, "application/json", &b)
 				if err == nil {
 					resp.Body.Close()
 				}
