@@ -97,7 +97,7 @@ func main() {
 		const msg = `{"sender":%q,"branch":%q,"client_IP":%q,"barcode":%q,"sip_message_type":%q}`
 		go func() {
 			client := http.Client{
-				Timeout: time.Duration(100 * time.Millisecond),
+				Timeout: time.Duration(200 * time.Millisecond),
 			}
 			for m := range logToRFID {
 				var b bytes.Buffer
