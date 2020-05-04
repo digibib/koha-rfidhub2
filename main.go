@@ -9,6 +9,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -126,6 +127,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var xForwardedRepl = strings.NewReplacer("10.173.251.150", "", ",", "", " ", "")
+
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -135,7 +138,8 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 	var ip string
 	if hub.config.WSProxy {
-		ip = r.Header.Get("X-Forwarded-For")
+		ip = xForwardedRepl.Replace(r.Header.Get("X-Forwarded-For"))
+
 	} else {
 		ip, _, err = net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
